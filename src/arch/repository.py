@@ -10,7 +10,7 @@ class Repository:
         # Cấu hình Database: Ưu tiên lấy từ .env, nếu không có thì dùng giá trị mặc định
         self.db_config = {
             'user': os.getenv('DB_USER', 'root'),
-            'password': os.getenv('DB_PASSWORD', 'trang@04062005'), 
+            'password': os.getenv('DB_PASSWORD',), 
             'host': os.getenv('DB_HOST', 'localhost'),
             'database': os.getenv('DB_NAME', 'sgms_db')
         }
