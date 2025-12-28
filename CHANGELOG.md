@@ -80,3 +80,4 @@ Fixed (Bug Fixes)
 Credits Display Issue: Fixed a bug where credit information was missing from the Grade entry response (solved by updating the Model to_dict method).
 
 Duplicate Data Entry: Implemented checks to prevent duplicate enrollment records for the same student in the same course.
+
