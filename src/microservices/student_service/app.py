@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from repository import StudentRepository
 from models import Student
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 repo = StudentRepository()
 
 @app.route("/api/students", methods=["POST"])

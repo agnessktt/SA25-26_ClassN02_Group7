@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from repository import CourseRepository
 from models import Course
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 # Tắt tự động xuống dòng để JSON gọn (cho đồng bộ với các service kia)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
