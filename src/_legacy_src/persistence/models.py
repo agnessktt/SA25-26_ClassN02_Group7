@@ -1,4 +1,4 @@
-# src/arch/models.py
+# src/_legacy_src/persistence/models.py
 
 class Student:
     def __init__(self, student_id, name):

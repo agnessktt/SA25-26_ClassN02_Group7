@@ -1,17 +1,16 @@
+# src/_legacy_src/persistence/repository.py
+
 import mysql.connector
 import os
 from dotenv import load_dotenv
-from models import Enrollment
+from src.arch.models import Student, Course, Enrollment
 
-# Load file .env từ thư mục gốc
-load_dotenv()
-
-class EnrollmentRepository:
+class Repository:
     def __init__(self):
-        # Cấu hình Database
+        # Cấu hình Database: Ưu tiên lấy từ .env, nếu không có thì dùng giá trị mặc định
         self.db_config = {
             'user': os.getenv('DB_USER', 'root'),
-            'password': os.getenv('DB_PASSWORD'),
+            'password': os.getenv('DB_PASSWORD',), 
             'host': os.getenv('DB_HOST', 'localhost'),
             'database': os.getenv('DB_NAME', 'sgms_db')
         }
@@ -20,7 +19,57 @@ class EnrollmentRepository:
         return mysql.connector.connect(**self.db_config)
 
     # =========================
-    # ENROLLMENT & GRADE LOGIC
+    # STUDENT REPOSITORY
+    # =========================
+    def add_student(self, student: Student):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            sql = "INSERT INTO students (student_id, name) VALUES (%s, %s)"
+            cursor.execute(sql, (student.student_id, student.name))
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_student_by_id(self, s_id: str):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT student_id, name FROM students WHERE student_id = %s", (s_id,))
+            row = cursor.fetchone()
+            return Student(row[0], row[1]) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+
+    # =========================
+    # COURSE REPOSITORY
+    # =========================
+    def add_course(self, course: Course):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            sql = "INSERT INTO courses (course_code, name, credits) VALUES (%s, %s, %s)"
+            cursor.execute(sql, (course.course_code, course.name, course.credits))
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_course_by_code(self, code: str):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT course_code, name, credits FROM courses WHERE course_code = %s", (code,))
+            row = cursor.fetchone()
+            return Course(row[0], row[1], row[2]) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+
+    # =========================
+    # ENROLLMENT REPOSITORY
     # =========================
     def add_enrollment(self, enrollment: Enrollment):
         conn = self._get_conn()
@@ -48,7 +97,6 @@ class EnrollmentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            # JOIN để lấy credits phục vụ hiển thị
             sql = """
                 SELECT e.enrollment_id, e.student_id, e.course_code, e.grade, c.credits
                 FROM enrollments e
@@ -99,7 +147,7 @@ class EnrollmentRepository:
             conn.close()
 
     def get_enrollments_by_student(self, student_id: str):
-        # Hàm này hỗ trợ lấy danh sách điểm của SV
+        # JOIN to fetch credits for GPA calculation
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
@@ -122,37 +170,21 @@ class EnrollmentRepository:
             conn.close()
 
     def calculate_gpa_by_student(self, student_id: str):
-        # Returns GPA (10-point), letter grade, and GPA (4-point)
+        # Returns GPA (10-point) and letter
         enrollments = self.get_enrollments_by_student(student_id)
-        
-        # Mặc định trả về 0 nếu chưa có điểm
-        default_res = {
-            "student_id": student_id, 
-            "gpa": 0.0, 
-            "grade": "F", 
-            "gpa4": 0.0
-        }
-
         if not enrollments:
-            return default_res
+            return {"student_id": student_id, "gpa": 0.0, "grade": "F"}
 
         total_points = 0.0
         total_credits = 0
-        
         for e in enrollments:
-            # Chỉ tính những môn đã có điểm
             if e.grade is not None and e.credits:
                 total_points += e.grade * e.credits
                 total_credits += e.credits
 
         if total_credits == 0:
-            return default_res
+            return {"student_id": student_id, "gpa": 0.0, "grade": "F"}
 
         gpa10 = round(total_points / total_credits, 2)
-        
-        return {
-            "student_id": student_id,
-            "gpa": gpa10,
-            "grade": Enrollment.convert_to_letter(gpa10), # Đổi sang chữ (A, B...)
-            "gpa4": Enrollment.convert_to_gpa4(gpa10)     # Đổi sang hệ 4 (4.0, 3.0...)
-        }
+        letter = Enrollment.convert_to_letter(gpa10)
+        return {"student_id": student_id, "gpa": gpa10, "grade": letter}

@@ -1,10 +1,10 @@
-# src/engines/enrollment_engine.py
+# File: src/_legacy_src/business_logic/enrollment_service.py
 
-from src.arch.repository import Repository
-from src.arch.models import Student, Course, Enrollment
+from src._legacy_src.persistence.repository import Repository
+from src._legacy_src.business_logic.models import Student, Course, Enrollment
 
 
-class EnrollmentEngine:
+class EnrollmentService: 
     def __init__(self):
         self.repo = Repository()
 

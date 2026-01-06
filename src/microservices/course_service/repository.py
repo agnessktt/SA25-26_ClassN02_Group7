@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from models import Course
 
-load_dotenv()
+from dotenv import load_dotenv
 
 class CourseRepository:
     def __init__(self):

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from models import Student
 
 # Load file .env từ thư mục gốc
-load_dotenv()
+from dotenv import load_dotenv
 
 class StudentRepository:
     def __init__(self):
