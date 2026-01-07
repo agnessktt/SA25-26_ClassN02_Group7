@@ -1,18 +1,43 @@
 from flask import Flask, request, jsonify
 import requests  # Thư viện để gọi API khác
+import threading # Thư viện để chạy đa luồng (cho Email)
+from flask_cors import CORS # Thư viện xử lý CORS cho Frontend
 from repository import EnrollmentRepository
 from models import Enrollment
-from flask_cors import CORS
 
 app = Flask(__name__)
+# 1. Kích hoạt CORS cho toàn bộ ứng dụng
 CORS(app)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
 repo = EnrollmentRepository()
 
-# ĐỊA CHỈ CỦA 2 SERVICE KIA
+# =======================================================
+# CẤU HÌNH ĐỊA CHỈ CÁC MICROSERVICES KHÁC
+# =======================================================
 STUDENT_SERVICE_URL = "http://127.0.0.1:5001/api/students"
-COURSE_SERVICE_URL = "http://127.0.0.1:5002/api/courses"
+COURSE_SERVICE_URL  = "http://127.0.0.1:5002/api/courses"
+EMAIL_SERVICE_URL   = "http://127.0.0.1:5005/api/email/send"
+
+# =======================================================
+# HÀM HỖ TRỢ: GỬI EMAIL BẤT ĐỒNG BỘ (BACKGROUND TASK)
+# =======================================================
+def send_email_async(student_id, grade, course_code):
+    """
+    Hàm này chạy trong một luồng (Thread) riêng biệt.
+    Nó giúp API trả về kết quả ngay lập tức mà không cần chờ gửi mail xong.
+    """
+    try:
+        payload = {
+            "student_id": student_id,
+            "grade": grade,
+            "course_code": course_code
+        }
+        # Gọi sang Email Service (Port 5005)
+        requests.post(EMAIL_SERVICE_URL, json=payload)
+    except Exception as ex:
+        # Chỉ in lỗi ra console server, không ảnh hưởng client
+        print(f"[Async Error] Failed to send email: {ex}")
 
 # =======================================================
 # 1. API ĐA NĂNG: LẤY DANH SÁCH (LỌC THEO SV) & ĐĂNG KÝ
@@ -75,7 +100,7 @@ def handle_enrollments():
             return jsonify({"error": str(ex)}), 400
 
 # ==========================================
-# 2. API NHẬP ĐIỂM (Tính điểm thành phần & Format đẹp)
+# 2. API NHẬP ĐIỂM (CÓ GỬI EMAIL TỰ ĐỘNG)
 # ==========================================
 @app.route("/api/enrollments/<int:eid>/grade", methods=["PUT"])
 def grade(eid):
@@ -101,19 +126,32 @@ def grade(eid):
         if final_grade < 0 or final_grade > 10:
             return jsonify({"error": "Grade must be between 0 and 10"}), 400
 
+        # Cập nhật xuống DB
         repo.update_grade(eid, final_grade)
         
-        # Lấy lại bản ghi để trả về
+        # Lấy lại bản ghi để trả về (và để lấy info gửi mail)
         updated = repo.get_enrollment_by_id(eid)
         if updated:
+            # Format hiển thị điểm thành phần (cho đẹp)
             formatted_components = {}
             if scores and weights:
                 for i, (s, w) in enumerate(zip(scores, weights)):
                     formatted_components[f"Score{i+1} ({w}%)"] = s
             else:
                 formatted_components = {"Final": final_grade}
-            
             updated.component_scores = formatted_components
+
+            # ---------------------------------------------------------
+            # [QUAN TRỌNG] GỌI EMAIL SERVICE (ASYNCHRONOUS)
+            # ---------------------------------------------------------
+            # Tạo luồng mới để gửi mail, không bắt Client phải chờ 2s
+            email_thread = threading.Thread(
+                target=send_email_async, 
+                args=(updated.student_id, final_grade, updated.course_code)
+            )
+            email_thread.start()
+            # ---------------------------------------------------------
+            
             return jsonify(updated.to_dict())
             
         return jsonify({"message": "Grade updated successfully"}), 200
@@ -146,4 +184,5 @@ def delete_enrollment(eid):
         return jsonify({"error": str(ex)}), 500
 
 if __name__ == "__main__":
+    # Chạy Service ở Port 5003
     app.run(debug=True, port=5003)
