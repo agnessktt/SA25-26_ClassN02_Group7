@@ -1655,7 +1655,7 @@ function editMajor(id) {
     if (!m) return;
 
     editingMajorId = id;
-    document.querySelector('#majorModal h2').textContent = 'Cập nhật ngành học';
+    document.querySelector('#majorModal h2').textContent = `Cập nhật ngành: ${m.name}`;
     document.querySelector('#majorModal .btn-primary').textContent = 'Cập nhật';
 
     document.getElementById('majorId').value = m.id;
@@ -1682,19 +1682,13 @@ async function loadMajorKnowledgeBlocksForEdit(majorId) {
         const data = await res.json();
         
         // Reset blocks
-        majorKnowledgeBlocksData = {
-            'cso_nganh': { name: 'Khối kiến thức cơ sở ngành', courses: [] },
-            'bo_tro': { name: 'Khối kiến thức bổ trợ', courses: [] },
-            'giao_duc_dai_cuong': { name: 'Khối kiến thức giáo dục đại cương', courses: [] },
-            'chuyen_nganh': { name: 'Khối kiến thức chuyên ngành', courses: [] },
-            'thuc_tap': { name: 'Khối thực tập', courses: [] }
-        };
+        majorKnowledgeBlocksData = initializeMajorKnowledgeBlocks();
 
         // Populate blocks with existing courses
         if (data.knowledge_blocks) {
-            Object.entries(data.knowledge_blocks).forEach(([blockId, blockData]) => {
-                if (majorKnowledgeBlocksData[blockId] && blockData.courses) {
-                    majorKnowledgeBlocksData[blockId].courses = blockData.courses.map(c => ({
+            Object.entries(data.knowledge_blocks).forEach(([blockId, coursesList]) => {
+                if (majorKnowledgeBlocksData[blockId]) {
+                    majorKnowledgeBlocksData[blockId].courses = coursesList.map(c => ({
                         id: c.course_id,
                         name: c.course_name,
                         credits: c.course_credits
