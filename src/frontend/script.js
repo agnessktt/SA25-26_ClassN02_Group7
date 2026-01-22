@@ -1365,7 +1365,7 @@ function renderMajors(data = majors) {
                 <td>${m.credits || '-'}</td>
                 <td>${fName || m.facId || '-'}</td>
                 <td class="action-btns">
-                    <button class="action-btn btn-primary" onclick="openMajorKnowledgeBlocks('${m.id}')">Khối kiến thức</button>
+                    <button class="action-btn btn-primary" onclick="openMajorKnowledgeBlocks('${m.id}')">Xem chi tiết</button>
                     <button class="action-btn btn-secondary" onclick="editMajor('${m.id}')">Sửa</button>
                     <button class="action-btn btn-danger" onclick="deleteMajor('${m.id}')">Xóa</button>
                 </td>
