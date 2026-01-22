@@ -1758,11 +1758,11 @@ function openMajorKnowledgeBlocks(majorId) {
     
     const major = majors.find(m => m.id == majorId);
     if (major) {
-        document.getElementById('majorDetailTitle').textContent = `Chi tiết ngành: ${major.name}`;
+        document.getElementById('majorDetailTitle').textContent = `Ngành học: ${major.name}`;
         document.getElementById('majorInfoSummary').innerHTML = `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div><strong>Mã ngành:</strong> ${major.id}</div>
-                <div><strong>Khoa:</strong> ${major.faculty_name || 'N/A'}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div><i class="fa-solid fa-barcode"></i> <strong>Mã ngành:</strong> ${major.id}</div>
+                <div><i class="fa-solid fa-building"></i> <strong>Khoa:</strong> ${major.facName || 'Chưa cập nhật'}</div>
             </div>
         `;
     }
@@ -1793,9 +1793,7 @@ async function loadKnowledgeBlocks(majorId) {
 
 function renderKnowledgeBlocks(blocks, totalCredits) {
     const container = document.getElementById('knowledgeBlocksContainerModal');
-    if (document.getElementById('totalCreditsDisplayModal')) {
-        document.getElementById('totalCreditsDisplayModal').textContent = totalCredits;
-    }
+    if (!container) return;
     
     const blockNames = {
         'cso_nganh': 'Khối kiến thức cơ sở ngành',
@@ -1821,7 +1819,6 @@ function renderKnowledgeBlocks(blocks, totalCredits) {
                                 <li style="margin-bottom: 8px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span>${course.course_name} (${course.course_id}) - ${course.course_credits} tín chỉ</span>
-                                        <button class="action-btn btn-danger" onclick="removeCourseFromBlock('${selectedMajorForBlocks}', '${blockKey}', '${course.course_id}')" style="padding: 4px 8px; font-size: 12px;">Xóa</button>
                                     </div>
                                 </li>
                             `).join('')}
@@ -1833,7 +1830,9 @@ function renderKnowledgeBlocks(blocks, totalCredits) {
     }).join('');
 
     // Update total credits display
-    document.getElementById('totalCreditsDisplay').textContent = totalCredits;
+    if (document.getElementById('totalCreditsDisplayModal')) {
+        document.getElementById('totalCreditsDisplayModal').textContent = totalCredits;
+    }
 }
 
 function openAddCourseToBlockModal() {
