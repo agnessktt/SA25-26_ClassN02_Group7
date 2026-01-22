@@ -1755,8 +1755,24 @@ let selectedMajorForBlocks = null;
 
 function openMajorKnowledgeBlocks(majorId) {
     selectedMajorForBlocks = majorId;
+    
+    const major = majors.find(m => m.id == majorId);
+    if (major) {
+        document.getElementById('majorDetailTitle').textContent = `Chi tiết ngành: ${major.name}`;
+        document.getElementById('majorInfoSummary').innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>Mã ngành:</strong> ${major.id}</div>
+                <div><strong>Khoa:</strong> ${major.faculty_name || 'N/A'}</div>
+            </div>
+        `;
+    }
+
     loadKnowledgeBlocks(majorId);
-    document.getElementById('knowledgeBlocksSection').style.display = 'block';
+    document.getElementById('majorDetailModal').style.display = 'block';
+}
+
+function closeMajorDetailModal() {
+    document.getElementById('majorDetailModal').style.display = 'none';
 }
 
 async function loadKnowledgeBlocks(majorId) {
@@ -1776,7 +1792,10 @@ async function loadKnowledgeBlocks(majorId) {
 }
 
 function renderKnowledgeBlocks(blocks, totalCredits) {
-    const container = document.getElementById('knowledgeBlocksContainer');
+    const container = document.getElementById('knowledgeBlocksContainerModal');
+    if (document.getElementById('totalCreditsDisplayModal')) {
+        document.getElementById('totalCreditsDisplayModal').textContent = totalCredits;
+    }
     
     const blockNames = {
         'cso_nganh': 'Khối kiến thức cơ sở ngành',

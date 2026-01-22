@@ -98,20 +98,6 @@
                     </table>
                 </div>
 
-                <!-- Knowledge Blocks Section -->
-                <div id="knowledgeBlocksSection" style="display: none; margin-top: 40px;">
-                    <h3 style="color: var(--primary); margin-bottom: 20px;">Khối kiến thức của ngành học</h3>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div style="font-size: 18px; font-weight: bold;">
-                            Tổng tín chỉ: <span id="totalCreditsDisplay" style="color: var(--primary);">0</span> tín chỉ
-                        </div>
-                        <button class="btn btn-primary" onclick="openAddCourseToBlockModal()">+ Thêm học phần vào khối kiến thức</button>
-                    </div>
-
-                    <div id="knowledgeBlocksContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
-                        <!-- Knowledge blocks will be rendered here -->
-                    </div>
-                </div>
             </div>
 
             <!-- Students Page -->
@@ -537,6 +523,34 @@
             <div style="margin-top: 25px; text-align: right;">
                 <button class="btn btn-secondary" onclick="closeFacultyModal()">Hủy bỏ</button>
                 <button class="btn btn-primary" onclick="addFaculty()">Lưu thông tin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Major Detail Modal -->
+    <div id="majorDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 85vh; overflow-y: auto;">
+            <span class="close-btn" onclick="closeMajorDetailModal()">&times;</span>
+            <h2 id="majorDetailTitle" style="color: var(--primary); margin-bottom: 20px;">Chi tiết ngành học</h2>
+            
+            <div id="majorInfoSummary" style="background: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--primary);">
+                <!-- Detailed major info will go here -->
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="color: var(--primary); margin: 0;">Cấu trúc chương trình học</h3>
+                <div style="font-size: 1.1rem; font-weight: bold;">
+                    Tổng số tín chỉ: <span id="totalCreditsDisplayModal" style="color: var(--primary);">0</span>
+                </div>
+            </div>
+            
+            <div id="knowledgeBlocksContainerModal" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                <!-- Knowledge blocks will be rendered here -->
+            </div>
+
+            <div style="margin-top: 25px; text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
+                <button class="btn btn-primary" onclick="openAddCourseToBlockModal()">+ Thêm học phần</button>
+                <button class="btn btn-secondary" onclick="closeMajorDetailModal()">Đóng</button>
             </div>
         </div>
     </div>
