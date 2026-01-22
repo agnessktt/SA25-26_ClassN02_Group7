@@ -264,10 +264,10 @@ async function deleteStudent(id) {
             showToast('Xóa sinh viên thành công');
             loadStudents();
         } else {
-            showToast('Xóa thất bại');
+            showToast('Xóa thất bại', 'error');
         }
     } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message);
+        showToast('Lỗi kết nối: ' + error.message, 'error');
     }
 }
 
@@ -860,17 +860,17 @@ async function deleteSchool(id) {
         if(res.ok) {
             showToast('Xóa thành công');
             loadGeneralInfo();
-            loadSchools();
+            loadSchoolsIntoFacultyFilter();
         } else {
             const err = await res.json();
             if (err.error && (err.error.includes('1451') || err.error.includes('foreign key'))) {
-                showToast('Không thể xóa: Trường này đang có các khoa trực thuộc. Vui lòng xóa các khoa trước.', true);
+                showToast('Không thể xóa: Trường này đang có các khoa trực thuộc. Vui lòng xóa các khoa trước.', 'error');
             } else {
-                showToast('Lỗi xóa: ' + (err.error || 'Unknown'), true);
+                showToast('Lỗi xóa: ' + (err.error || 'Unknown'), 'error');
             }
         }
     } catch(e) {
-        showToast('Lỗi kết nối: ' + e.message, true);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     }
 }
 
@@ -912,13 +912,13 @@ async function addSchool() {
             showToast(editingSchoolId ? 'Cập nhật thành công!' : 'Thêm trường thành công!');
             closeSchoolModal();
             loadGeneralInfo();
-            loadSchools(); 
+            loadSchoolsIntoFacultyFilter(); 
         } else {
             const err = await res.json();
-            showToast('Lỗi: ' + (err.error || 'Unknown error'));
+            showToast('Lỗi: ' + (err.error || 'Unknown error'), 'error');
         }
     } catch (e) {
-        showToast('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     }
 }
 
@@ -1195,10 +1195,10 @@ async function deleteFaculty(id) {
             loadFaculties();
         } else {
             const err = await res.json();
-            showToast('Lỗi xóa: ' + (err.error || 'Unknown error'));
+            showToast('Lỗi xóa: ' + (err.error || 'Unknown error'), 'error');
         }
     } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message);
+        showToast('Lỗi kết nối: ' + error.message, 'error');
     }
 }
 
@@ -1442,10 +1442,10 @@ async function deleteMajor(id) {
             showToast('Xóa thành công');
             loadMajors();
         } else {
-            showToast('Xóa thất bại');
+            showToast('Xóa thất bại', 'error');
         }
     } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message);
+        showToast('Lỗi kết nối: ' + error.message, 'error');
     }
 }
 
