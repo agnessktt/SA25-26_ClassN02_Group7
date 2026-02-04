@@ -164,7 +164,6 @@ def update_grade(enrollment_id):
                 # ---------------------------------------------------------
                 # [EDA] GỬI THÔNG BÁO QUA RABBITMQ
                 # ---------------------------------------------------------
-                # Không gọi trực tiếp Email Service nữa, mà bắn Event
                 publish_grade_event(updated.student_id, final_grade, updated.course_id)
                 # ---------------------------------------------------------
                 

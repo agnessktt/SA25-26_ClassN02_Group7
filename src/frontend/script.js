@@ -9,6 +9,7 @@ const API_FACULTIES = 'http://127.0.0.1:5007/api/faculties';
 const API_SCHOOL_FACULTIES = 'http://127.0.0.1:5007/api/schools'; // For getting faculties of a school
 const API_MAJORS = 'http://127.0.0.1:5009/api/majors'; // New Major Service
 const API_UNIS = 'http://127.0.0.1:5008/api/unis'; // New Uni Service
+const API_NOTIFICATIONS = 'http://127.0.0.1:5010/api/notifications';
 
 // Data Storage
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
@@ -32,6 +33,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initApp() {
     console.log("App initialized. Current user:", currentUser);
+    
+    // Load notification count initially
+    loadNotifications();
+
     if (currentUser) {
         checkStudentProfileAndShow();
     } else {
@@ -405,6 +410,87 @@ function showToast(message, type = 'success') {
     toast.className = className;
     toast.textContent = message;
     setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+}
+
+// Notifications
+function toggleNotificationBox() {
+    const box = document.getElementById('notification-box');
+    if (box) {
+        if (box.style.display === 'block') {
+            box.style.display = 'none';
+        } else {
+            box.style.display = 'block';
+            loadNotifications();
+        }
+    }
+}
+
+function loadNotifications() {
+    if (!currentUser) return;
+    
+    // Notifications are primary for students
+    const studentId = (currentUser.role === 'Student') ? getCurrentStudentId() : null;
+    if (!studentId) {
+        // If not a student, maybe they don't have personal notifications yet
+        const badge = document.getElementById('unread-count');
+        if (badge) badge.style.display = 'none';
+        return;
+    }
+
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+
+    fetch(`${API_NOTIFICATIONS}?student_id=${studentId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            
+            if (data.length === 0) {
+                list.innerHTML = `<p class="text-center-muted" style="padding: 20px;">Không có thông báo mới</p>`;
+            } else {
+                list.innerHTML = data.map(n => `
+                    <div class="notif-item ${!n.is_read ? 'unread' : ''}" onclick="markNotifRead(${n.id})">
+                        <div class="notif-item-title">${n.title}</div>
+                        <div class="notif-item-desc">${n.message}</div>
+                        <div class="notif-item-time">${formatDate(n.created_at)}</div>
+                    </div>
+                `).join('');
+            }
+
+            // Update count
+            const unreadCount = data.filter(n => !n.is_read).length;
+            const badge = document.getElementById('unread-count');
+            if (badge) {
+                badge.textContent = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+            }
+        })
+        .catch(err => {
+            console.error("Failed to load notifications:", err);
+            list.innerHTML = `<p class="text-center-muted" style="padding: 20px; color: var(--danger);">Lỗi tải thông báo</p>`;
+        });
+}
+
+function markNotifRead(id) {
+    fetch(`${API_NOTIFICATIONS}/read/${id}`, { method: 'POST' })
+        .then(() => loadNotifications())
+        .catch(err => console.error("Error marking read:", err));
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit'
+        });
+    } catch (e) {
+        return dateStr;
+    }
 }
 
 // Navigation

@@ -148,11 +148,26 @@
             <div class="main-content">
                 <div class="header">
                     <h1>Hệ thống quản lý học tập </h1>
-                    <div id="user-info-header" style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
+                    <div id="user-info-header" style="margin-left: auto; display: flex; align-items: center; gap: 20px;">
+                        <div class="notification-wrapper common-view" style="position: relative; cursor: pointer;" onclick="toggleNotificationBox()">
+                            <i class="fas fa-bell" style="font-size: 1.25rem; color: var(--text-secondary);"></i>
+                            <span id="unread-count" class="badge-count" style="display: none;">0</span>
+                        </div>
                         <span id="display-user-name" style="font-weight: 600;"></span>
                         <button class="btn btn-secondary btn-sm" onclick="logout()">
                             <i class="fas fa-sign-out-alt"></i> Đăng xuất
                         </button>
+                    </div>
+
+                    <!-- Notification Box -->
+                    <div id="notification-box" class="notification-dropdown">
+                        <div class="notif-header">
+                            <h3>Thông báo</h3>
+                            <button class="btn-close-notif" onclick="toggleNotificationBox()">×</button>
+                        </div>
+                        <div id="notif-list" class="notif-content">
+                            <p class="text-center-muted" style="padding: 20px;">Không có thông báo mới</p>
+                        </div>
                     </div>
                 </div>
 
