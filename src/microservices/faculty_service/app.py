@@ -21,6 +21,10 @@ def handle_faculties():
     if request.method == "POST":
         data = request.get_json(force=True)
         try:
+            # Helper to convert empty string to None
+            def opt_val(val):
+                return val if val and str(val).strip() else None
+
             f_id = data.get("fac_id")
             f_name = data.get("fac_name")
             
@@ -33,7 +37,7 @@ def handle_faculties():
                 fac_address=data.get("fac_address"),
                 fac_email=data.get("fac_email"),
                 fac_number=data.get("fac_number"),
-                mem_school_id=data.get("mem_school_id")
+                mem_school_id=opt_val(data.get("mem_school_id"))
             )
             repo.add_faculty(faculty)
             return jsonify(faculty.to_dict()), 201
@@ -51,13 +55,17 @@ def faculty_detail(fac_id):
     if request.method == "PUT":
         data = request.get_json(force=True)
         try:
+            # Helper to convert empty string to None
+            def opt_val(val):
+                return val if val and str(val).strip() else None
+
             faculty = Faculty(
                 fac_id=fac_id, 
                 fac_name=data.get("fac_name"),
                 fac_address=data.get("fac_address"),
                 fac_email=data.get("fac_email"),
                 fac_number=data.get("fac_number"),
-                mem_school_id=data.get("mem_school_id")
+                mem_school_id=opt_val(data.get("mem_school_id"))
             )
             success = repo.update_faculty(faculty)
             if success:

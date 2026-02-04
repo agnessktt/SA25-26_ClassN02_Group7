@@ -22,7 +22,7 @@ class MajorRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "INSERT INTO major (marjor_id, major_name, major_credits, fac_id) VALUES (%s, %s, %s, %s)"
+            sql = "INSERT INTO major (major_id, major_name, major_credits, fac_id) VALUES (%s, %s, %s, %s)"
             cursor.execute(sql, (major.major_id, major.major_name, major.major_credits, major.fac_id))
             
             if courses:
@@ -45,7 +45,7 @@ class MajorRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT marjor_id, major_name, major_credits, fac_id FROM major WHERE marjor_id = %s", (m_id,))
+            cursor.execute("SELECT major_id, major_name, major_credits, fac_id FROM major WHERE major_id = %s", (m_id,))
             row = cursor.fetchone()
             return Major(row[0], row[1], row[2], row[3]) if row else None
         finally:
@@ -57,7 +57,7 @@ class MajorRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT m.marjor_id, m.major_name, m.major_credits, m.fac_id, f.fac_name 
+                SELECT m.major_id, m.major_name, m.major_credits, m.fac_id, f.fac_name 
                 FROM major m
                 LEFT JOIN faculty f ON m.fac_id = f.fac_id
             """
@@ -72,7 +72,7 @@ class MajorRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "UPDATE major SET major_name = %s, major_credits = %s, fac_id = %s WHERE marjor_id = %s"
+            sql = "UPDATE major SET major_name = %s, major_credits = %s, fac_id = %s WHERE major_id = %s"
             cursor.execute(sql, (major.major_name, major.major_credits, major.fac_id, major.major_id))
             
             # Cập nhật courses nếu có
@@ -101,7 +101,7 @@ class MajorRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("DELETE FROM major WHERE marjor_id = %s", (m_id,))
+            cursor.execute("DELETE FROM major WHERE major_id = %s", (m_id,))
             conn.commit()
         finally:
             cursor.close()
@@ -123,7 +123,7 @@ class MajorRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT m.marjor_id, m.major_name, m.major_credits, m.fac_id, f.fac_name
+                SELECT m.major_id, m.major_name, m.major_credits, m.fac_id, f.fac_name
                 FROM major m
                 LEFT JOIN faculty f ON m.fac_id = f.fac_id
                 WHERE m.fac_id = %s
@@ -145,6 +145,10 @@ class MajorRepository:
                 VALUES (%s, %s, %s, %s, %s)
             """
             cursor.execute(sql, (major_id, block_type, course_id, course_name, course_credits))
+            
+            # Update total credits in major table for consistency (COALESCE to handle 0 courses)
+            cursor.execute("UPDATE major SET major_credits = (SELECT COALESCE(SUM(course_credits), 0) FROM major_knowledge_block_courses WHERE major_id = %s) WHERE major_id = %s", (major_id, major_id))
+            
             conn.commit()
             return True
         except Exception as e:
@@ -229,6 +233,10 @@ class MajorRepository:
                 WHERE major_id = %s AND block_type = %s AND course_id = %s
             """
             cursor.execute(sql, (major_id, block_type, course_id))
+            
+            # Update total credits in major table for consistency (COALESCE to handle 0 courses)
+            cursor.execute("UPDATE major SET major_credits = (SELECT COALESCE(SUM(course_credits), 0) FROM major_knowledge_block_courses WHERE major_id = %s) WHERE major_id = %s", (major_id, major_id))
+            
             conn.commit()
             return cursor.rowcount > 0
         finally:

@@ -1,12 +1,13 @@
 class User:
-    def __init__(self, username, password, role):
+    def __init__(self, username, password, role, email=None):
         self.username = username
         self.password = password
         self.role = role
+        self.email = email
 
     def to_dict(self):
         return {
             "username": self.username,
-            "role": self.role
-            # Password thường không trả về, hoặc trả về tùy logic
+            "role": self.role,
+            "email": self.email
         }

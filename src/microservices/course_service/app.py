@@ -36,15 +36,19 @@ def handle_courses():
     if request.method == "POST":
         data = request.get_json(force=True)
         try:
+            # Helper to convert empty string to None
+            def opt_val(val):
+                return val if val and str(val).strip() else None
+
             course = Course(
                 data["course_id"], 
                 data["course_name"], 
                 int(data.get("total_credits", 0)),
                 int(data.get("theory_credits", 0)),
                 int(data.get("practical_credits", 0)),
-                data.get("prerequisite"),
-                data.get("co_requisite"),
-                data.get("previous")
+                opt_val(data.get("prerequisite")),
+                opt_val(data.get("co_requisite")),
+                opt_val(data.get("previous"))
             )
             
             repo.add_course(course)
@@ -67,15 +71,19 @@ def get_course(course_id):
         if request.method == "PUT":
             data = request.get_json(force=True)
             try:
+                # Helper to convert empty string to None
+                def opt_val(val):
+                    return val if val and str(val).strip() else None
+
                 course_update = Course(
                     course_id,
                     data.get("course_name"), 
                     int(data.get("total_credits", 0)),
                     int(data.get("theory_credits", 0)),
                     int(data.get("practical_credits", 0)),
-                    data.get("prerequisite"),
-                    data.get("co_requisite"),
-                    data.get("previous")
+                    opt_val(data.get("prerequisite")),
+                    opt_val(data.get("co_requisite")),
+                    opt_val(data.get("previous"))
                 )
                 
                 success = repo.update_course(course_id, course_update)

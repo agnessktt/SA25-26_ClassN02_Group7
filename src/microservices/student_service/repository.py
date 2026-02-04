@@ -22,8 +22,8 @@ class StudentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "INSERT INTO students (student_id, student_name, date_of_birth, gender, student_class, student_email, cohort) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(sql, (student.student_id, student.student_name, student.date_of_birth, student.gender, student.student_class, student.student_email, student.cohort))
+            sql = "INSERT INTO students (student_id, student_name, student_email, gender, date_of_birth, cohort, student_class) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql, (student.student_id, student.student_name, student.student_email, student.gender, student.date_of_birth, student.cohort, student.student_class))
             conn.commit()
         finally:
             cursor.close()
@@ -33,7 +33,8 @@ class StudentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT student_id, student_name, date_of_birth, gender, student_class, student_email, cohort FROM students WHERE student_id = %s", (s_id,))
+            # Check by both student_id AND student_email for flexibility
+            cursor.execute("SELECT student_id, student_name, student_email, gender, date_of_birth, cohort, student_class FROM students WHERE student_id = %s OR student_email = %s", (s_id, s_id))
             row = cursor.fetchone()
             return Student(row[0], row[1], row[2], row[3], row[4], row[5], row[6]) if row else None
         finally:
@@ -44,7 +45,7 @@ class StudentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT student_id, student_name, date_of_birth, gender, student_class, student_email, cohort FROM students")
+            cursor.execute("SELECT student_id, student_name, student_email, gender, date_of_birth, cohort, student_class FROM students")
             rows = cursor.fetchall()
             return [Student(row[0], row[1], row[2], row[3], row[4], row[5], row[6]) for row in rows]
         finally:
@@ -55,8 +56,8 @@ class StudentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "UPDATE students SET student_name = %s, date_of_birth = %s, gender = %s, student_class = %s, student_email = %s, cohort = %s WHERE student_id = %s"
-            cursor.execute(sql, (student.student_name, student.date_of_birth, student.gender, student.student_class, student.student_email, student.cohort, student.student_id))
+            sql = "UPDATE students SET student_name = %s, student_email = %s, gender = %s, date_of_birth = %s, cohort = %s, student_class = %s WHERE student_id = %s"
+            cursor.execute(sql, (student.student_name, student.student_email, student.gender, student.date_of_birth, student.cohort, student.student_class, student.student_id))
             conn.commit()
             return cursor.rowcount > 0
         finally:

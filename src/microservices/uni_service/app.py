@@ -30,7 +30,8 @@ def handle_unis():
             uni = Uni(
                 mem_school_id=u_id,
                 mem_school_name=u_name,
-                mem_school_websit=data.get("mem_school_websit")
+                mem_school_website=data.get("mem_school_website"),
+                fanpage=data.get("fanpage")
             )
             repo.add_uni(uni)
             return jsonify(uni.to_dict()), 201
@@ -51,7 +52,8 @@ def uni_detail(u_id):
             uni = Uni(
                 mem_school_id=u_id, 
                 mem_school_name=data.get("mem_school_name"),
-                mem_school_websit=data.get("mem_school_websit")
+                mem_school_website=data.get("mem_school_website"),
+                fanpage=data.get("fanpage")
             )
             success = repo.update_uni(uni)
             if success:

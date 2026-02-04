@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 import requests  # Thư viện để gọi API khác
 import threading # Thư viện để chạy đa luồng (cho Email)
+import pika
+import json
 from flask_cors import CORS # Thư viện xử lý CORS cho Frontend
 from repository import GradeRepository
 from models import Grade, Enrollment
@@ -19,10 +21,44 @@ STUDENT_SERVICE_URL = "http://127.0.0.1:5001/api/students"
 COURSE_SERVICE_URL  = "http://127.0.0.1:5002/api/courses"
 EMAIL_SERVICE_URL   = "http://127.0.0.1:5005/api/email/send"
 
+# RabbitMQ Config
+RABBITMQ_HOST = 'localhost'
+QUEUE_NAME = 'grade_events'
+
 # =======================================================
-# HÀM HỖ TRỢ: GỬI EMAIL BẤT ĐỒNG BỘ (BACKGROUND TASK)
+# HÀM HỖ TRỢ: PHÁT SỰ KIỆN QUA RABBITMQ (EDA)
 # =======================================================
-def send_email_async(student_id, grade, course_code):
+def publish_grade_event(student_id, grade, course_id):
+    """
+    Kết nối RabbitMQ và đẩy thông tin điểm vào hàng đợi.
+    Đây là mô hình Producer trong EDA.
+    """
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.queue_declare(queue=QUEUE_NAME)
+
+        message = json.dumps({
+            "student_id": student_id,
+            "grade": grade,
+            "course_id": course_id,
+            "event": "GRADE_UPDATED"
+        })
+
+        channel.basic_publish(
+            exchange='',
+            routing_key=QUEUE_NAME,
+            body=message
+        )
+        print(f" [x] [RabbitMQ] Sent Grade Event for Student {student_id}")
+        connection.close()
+    except Exception as ex:
+        print(f" [!] RabbitMQ Error: {ex}")
+
+# =======================================================
+# HÀM HỖ TRỢ: GỬI EMAIL BẤT ĐỒNG BỘ (TRUYỀN THỐNG)
+# =======================================================
+def send_email_async(student_id, grade, course_id):
     """
     Hàm này chạy trong một luồng (Thread) riêng biệt.
     Nó giúp API trả về kết quả ngay lập tức mà không cần chờ gửi mail xong.
@@ -31,7 +67,7 @@ def send_email_async(student_id, grade, course_code):
         payload = {
             "student_id": student_id,
             "grade": grade,
-            "course_code": course_code
+            "course_id": course_id
         }
         # Gọi sang Email Service (Port 5005)
         requests.post(EMAIL_SERVICE_URL, json=payload)
@@ -70,7 +106,7 @@ def add_enrollment():
     try:
         enrollment = Enrollment(
             student_id=data.get("student_id"),
-            course_code=data.get("course_code")
+            course_id=data.get("course_id") or data.get("course_code")
         )
         enrollment_id = repo.add_enrollment(enrollment)
         enrollment.enrollment_id = enrollment_id
@@ -102,8 +138,8 @@ def update_grade(enrollment_id):
         weights = data.get("weights") # e.g., [0.1, 0.4, 0.5]
 
         if scores and weights and len(scores) == len(weights):
-            # Basic weighted calculation
-            final_grade = sum(s * w for s, w in zip(scores, weights))
+            # Use static method from Grade model
+            final_grade = Grade.weighted_average(scores, weights)
             success = repo.update_grade(enrollment_id, final_grade, scores)
         else:
             # Fallback for direct grade update
@@ -126,14 +162,10 @@ def update_grade(enrollment_id):
                 updated.component_scores = formatted_components
 
                 # ---------------------------------------------------------
-                # [QUAN TRỌNG] GỌI EMAIL SERVICE (ASYNCHRONOUS)
+                # [EDA] GỬI THÔNG BÁO QUA RABBITMQ
                 # ---------------------------------------------------------
-                # Tạo luồng mới để gửi mail, không bắt Client phải chờ 2s
-                email_thread = threading.Thread(
-                    target=send_email_async, 
-                    args=(updated.student_id, final_grade, updated.course_code)
-                )
-                email_thread.start()
+                # Không gọi trực tiếp Email Service nữa, mà bắn Event
+                publish_grade_event(updated.student_id, final_grade, updated.course_id)
                 # ---------------------------------------------------------
                 
                 return jsonify(updated.to_dict()), 200

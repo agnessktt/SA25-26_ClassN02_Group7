@@ -82,7 +82,7 @@ class FacultyRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_websit FROM uni")
+            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_website FROM uni")
             rows = cursor.fetchall()
             return [{'id': row[0], 'name': row[1], 'website': row[2]} for row in rows]
         finally:

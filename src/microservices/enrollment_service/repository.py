@@ -21,10 +21,20 @@ class EnrollmentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "INSERT INTO enrollments (student_id, course_id) VALUES (%s, %s)"
+            # 1. Check if already enrolled
+            cursor.execute("SELECT grade_id FROM grade WHERE student_id = %s AND course_id = %s", (enrollment.student_id, enrollment.course_id))
+            if cursor.fetchone():
+                raise Exception("Sinh viên đã đăng ký học phần này rồi")
+
+            # 2. Insert into 'grade' table
+            sql = "INSERT INTO grade (student_id, course_id) VALUES (%s, %s)"
             cursor.execute(sql, (enrollment.student_id, enrollment.course_id))
             conn.commit()
             return cursor.lastrowid
+        except mysql.connector.Error as err:
+            if err.errno == 1452: # Foreign key constraint fails
+                raise Exception("Mã sinh viên hoặc Mã học phần không tồn tại trong hệ thống")
+            raise err
         finally:
             cursor.close()
             conn.close()
@@ -34,15 +44,15 @@ class EnrollmentRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT e.enrollment_id, e.student_id, e.course_id, c.total_credits
-                FROM enrollments e
-                JOIN courses c ON e.course_id = c.course_id
+                SELECT g.grade_id, g.student_id, g.course_id, c.total_credits
+                FROM grade g
+                JOIN courses c ON g.course_id = c.course_id
             """
             cursor.execute(sql)
             rows = cursor.fetchall()
             results = []
             for r in rows:
-                e = Enrollment(r[0], r[1], r[2])
+                e = Enrollment(r[0], r[1], r[2]) # ID, Student, Course
                 e.credits = r[3]
                 results.append(e)
             return results
@@ -55,10 +65,10 @@ class EnrollmentRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT e.enrollment_id, e.student_id, e.course_id, c.total_credits
-                FROM enrollments e
-                JOIN courses c ON e.course_id = c.course_id
-                WHERE e.student_id = %s
+                SELECT g.grade_id, g.student_id, g.course_id, c.total_credits
+                FROM grade g
+                JOIN courses c ON g.course_id = c.course_id
+                WHERE g.student_id = %s
             """
             cursor.execute(sql, (student_id,))
             rows = cursor.fetchall()
@@ -76,7 +86,7 @@ class EnrollmentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "UPDATE enrollments SET student_id = %s, course_id = %s WHERE enrollment_id = %s"
+            sql = "UPDATE grade SET student_id = %s, course_id = %s WHERE grade_id = %s"
             cursor.execute(sql, (student_id, course_id, enrollment_id))
             conn.commit()
             return cursor.rowcount > 0
@@ -88,7 +98,7 @@ class EnrollmentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("DELETE FROM enrollments WHERE enrollment_id = %s", (e_id,))
+            cursor.execute("DELETE FROM grade WHERE grade_id = %s", (e_id,))
             conn.commit()
         finally:
             cursor.close()

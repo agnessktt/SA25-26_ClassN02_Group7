@@ -22,8 +22,8 @@ class UniRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "INSERT INTO uni (mem_school_id, mem_school_name, mem_school_websit) VALUES (%s, %s, %s)"
-            cursor.execute(sql, (uni.mem_school_id, uni.mem_school_name, uni.mem_school_websit))
+            sql = "INSERT INTO uni (mem_school_id, mem_school_name, mem_school_website, fanpage) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (uni.mem_school_id, uni.mem_school_name, uni.mem_school_website, uni.fanpage))
             conn.commit()
         finally:
             cursor.close()
@@ -33,9 +33,9 @@ class UniRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_websit FROM uni WHERE mem_school_id = %s", (u_id,))
+            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_website, fanpage FROM uni WHERE mem_school_id = %s", (u_id,))
             row = cursor.fetchone()
-            return Uni(row[0], row[1], row[2]) if row else None
+            return Uni(row[0], row[1], row[2], row[3]) if row else None
         finally:
             cursor.close()
             conn.close()
@@ -44,9 +44,9 @@ class UniRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_websit FROM uni")
+            cursor.execute("SELECT mem_school_id, mem_school_name, mem_school_website, fanpage FROM uni")
             rows = cursor.fetchall()
-            return [Uni(row[0], row[1], row[2]) for row in rows]
+            return [Uni(row[0], row[1], row[2], row[3]) for row in rows]
         finally:
             cursor.close()
             conn.close()
@@ -55,8 +55,8 @@ class UniRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = "UPDATE uni SET mem_school_name = %s, mem_school_websit = %s WHERE mem_school_id = %s"
-            cursor.execute(sql, (uni.mem_school_name, uni.mem_school_websit, uni.mem_school_id))
+            sql = "UPDATE uni SET mem_school_name = %s, mem_school_website = %s, fanpage = %s WHERE mem_school_id = %s"
+            cursor.execute(sql, (uni.mem_school_name, uni.mem_school_website, uni.fanpage, uni.mem_school_id))
             conn.commit()
             return cursor.rowcount > 0
         finally:

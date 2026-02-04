@@ -1,5 +1,5 @@
 class Grade:
-    def __init__(self, grade_id, student_id, course_id, attendance1_score, attendance2_score, midterm_score, final_score, avg_score):
+    def __init__(self, grade_id, student_id, course_id, attendance1_score, attendance2_score, midterm_score, final_score, avg_score, credits=0):
         self.grade_id = grade_id
         self.student_id = student_id
         self.course_id = course_id
@@ -8,17 +8,20 @@ class Grade:
         self.midterm_score = midterm_score
         self.final_score = final_score
         self.avg_score = avg_score
+        self.credits = credits
 
     def to_dict(self):
         return {
             "grade_id": self.grade_id,
             "student_id": self.student_id,
             "course_id": self.course_id,
-            "attendance1_score": str(self.attendance1_score) if self.attendance1_score is not None else None,
-            "attendance2_score": str(self.attendance2_score) if self.attendance2_score is not None else None,
-            "midterm_score": str(self.midterm_score) if self.midterm_score is not None else None,
-            "final_score": str(self.final_score) if self.final_score is not None else None,
-            "avg_score": str(self.avg_score) if self.avg_score is not None else None
+            "grade": self.avg_score,
+            "component_scores": {
+                "attendance1": self.attendance1_score,
+                "attendance2": self.attendance2_score,
+                "midterm": self.midterm_score,
+                "final": self.final_score
+            }
         }
 
     @staticmethod
@@ -38,6 +41,11 @@ class Grade:
         valid_pairs = [(s, w) for s, w in zip(scores, weights) if s is not None]
         if not valid_pairs:
              return 0.0
+
+        # Rule: Nếu điểm giữa kì (index 2) hoặc cuối kì (index 3) bằng 0 thì trung bình = 0 (F)
+        if len(scores) >= 4:
+            if scores[2] == 0 or scores[3] == 0:
+                return 0.0
 
         weighted_sum = sum(s * w for s, w in valid_pairs)
         return round(weighted_sum / total_weight, 2)
@@ -67,10 +75,10 @@ class Grade:
         return 0.0
 
 class Enrollment:
-    def __init__(self, enrollment_id=None, student_id=None, course_code=None, grade=None):
+    def __init__(self, enrollment_id=None, student_id=None, course_id=None, grade=None):
         self.enrollment_id = enrollment_id
         self.student_id = student_id
-        self.course_code = course_code
+        self.course_id = course_id
         self.grade = grade
         self.component_scores = {}
 
@@ -79,7 +87,7 @@ class Enrollment:
             "enrollment_id": self.enrollment_id,
             "id": self.enrollment_id,  # Compatibility
             "student_id": self.student_id,
-            "course_code": self.course_code,
+            "course_id": self.course_id,
             "grade": self.grade,
             "component_scores": self.component_scores
         }

@@ -1,7 +1,7 @@
 import mysql.connector
 import os
 from dotenv import load_dotenv, find_dotenv
-from models import Grade
+from models import Grade, Enrollment
 
 # Load file .env từ thư mục gốc
 load_dotenv(find_dotenv())
@@ -22,24 +22,36 @@ class GradeRepository:
     # =========================
     # ENROLLMENT & GRADE LOGIC
     # =========================
-    def add_grade(self, grade_obj: Grade):
-        pass
-
-    def update_grade(self, grade_id: int, grade_obj: Grade):
+    def add_enrollment(self, enrollment):
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            sql = """UPDATE grade SET attendance1_score=%s, attendance2_score=%s, midterm_score=%s, 
-                     final_score=%s, avg_score=%s WHERE grade_id=%s"""
-            cursor.execute(sql, (grade_obj.attendance1_score, grade_obj.attendance2_score,
-                                 grade_obj.midterm_score, grade_obj.final_score, grade_obj.avg_score, grade_id))
+            sql = "INSERT INTO grade (student_id, course_id) VALUES (%s, %s)"
+            cursor.execute(sql, (enrollment.student_id, enrollment.course_id))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            cursor.close()
+            conn.close()
+
+    def update_grade(self, enrollment_id, final_grade, scores=None):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            if scores and len(scores) >= 4:
+                sql = """UPDATE grade SET attendance1_score=%s, attendance2_score=%s, midterm_score=%s, 
+                         final_score=%s, avg_score=%s WHERE grade_id=%s"""
+                cursor.execute(sql, (scores[0], scores[1], scores[2], scores[3], final_grade, enrollment_id))
+            else:
+                sql = "UPDATE grade SET avg_score=%s WHERE grade_id=%s"
+                cursor.execute(sql, (final_grade, enrollment_id))
             conn.commit()
             return cursor.rowcount > 0
         finally:
             cursor.close()
             conn.close()
 
-    def get_grade_by_id(self, grade_id: int):
+    def get_enrollment_by_id(self, enrollment_id):
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
@@ -50,24 +62,31 @@ class GradeRepository:
                 JOIN courses c ON g.course_id = c.course_id
                 WHERE g.grade_id = %s
             """
-            cursor.execute(sql, (grade_id,))
+            cursor.execute(sql, (enrollment_id,))
             row = cursor.fetchone()
             if row:
-                g = Grade(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7])
-                # Note: Grade model doesn't strictly have 'credits' attribute in __init__ but we can add it dynamically or update __init__
-                g.credits = row[8]
-                return g
+                g = Grade(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8])
+                # Convert Grade to Enrollment for App UI compatibility
+                e = Enrollment(g.grade_id, g.student_id, g.course_id, g.avg_score)
+                e.component_scores = {
+                    "attendance1": g.attendance1_score,
+                    "attendance2": g.attendance2_score,
+                    "midterm": g.midterm_score,
+                    "final": g.final_score
+                }
+                return e
             return None
         finally:
             cursor.close()
             conn.close()
 
-    def delete_grade(self, grade_id: int):
+    def delete_enrollment(self, enrollment_id):
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("DELETE FROM grade WHERE grade_id = %s", (grade_id,))
+            cursor.execute("DELETE FROM grade WHERE grade_id = %s", (enrollment_id,))
             conn.commit()
+            return cursor.rowcount > 0
         finally:
             cursor.close()
             conn.close()
@@ -86,8 +105,7 @@ class GradeRepository:
             rows = cursor.fetchall()
             results = []
             for r in rows:
-                g = Grade(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7])
-                g.credits = r[8]
+                g = Grade(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8])
                 results.append(g)
             return results
         finally:
@@ -109,8 +127,7 @@ class GradeRepository:
             rows = cursor.fetchall()
             results = []
             for r in rows:
-                g = Grade(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7])
-                g.credits = r[8]
+                g = Grade(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8])
                 results.append(g)
             return results
         finally:
@@ -138,7 +155,12 @@ class GradeRepository:
         for g in grades:
             # Chỉ tính những môn đã có điểm
             if g.avg_score is not None and g.credits:
-                total_points += float(g.avg_score) * g.credits
+                # Rule: Nếu điểm giữa kì hoặc cuối kì là 0 thì coi như 0 điểm (F) cho môn đó
+                score = float(g.avg_score)
+                if g.midterm_score == 0 or g.final_score == 0:
+                    score = 0.0
+                
+                total_points += score * g.credits
                 total_credits += g.credits
 
         if total_credits == 0:

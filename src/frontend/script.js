@@ -1,14 +1,17 @@
 // API Configuration
-const API_STUDENTS = 'http://localhost:5001/api/students';
-const API_COURSES = 'http://localhost:5002/api/courses';
-const API_GRADES = 'http://localhost:5003/api/grades';
-const API_ENROLLMENTS_SVC = 'http://localhost:5006/api/enrollments';
-const API_FACULTIES = 'http://localhost:5007/api/faculties';
-const API_SCHOOL_FACULTIES = 'http://localhost:5007/api/schools'; // For getting faculties of a school
-const API_MAJORS = 'http://localhost:5009/api/majors'; // New Major Service
-const API_UNIS = 'http://localhost:5008/api/unis'; // New Uni Service
+const API_STUDENTS = 'http://127.0.0.1:5001/api/students';
+const API_COURSES = 'http://127.0.0.1:5002/api/courses';
+const API_GRADES = 'http://127.0.0.1:5003/api/grades';
+const API_IDENTITY = 'http://127.0.0.1:5004/api/login';
+const API_USERS = 'http://127.0.0.1:5004/api/users';
+const API_ENROLLMENTS_SVC = 'http://127.0.0.1:5006/api/enrollments';
+const API_FACULTIES = 'http://127.0.0.1:5007/api/faculties';
+const API_SCHOOL_FACULTIES = 'http://127.0.0.1:5007/api/schools'; // For getting faculties of a school
+const API_MAJORS = 'http://127.0.0.1:5009/api/majors'; // New Major Service
+const API_UNIS = 'http://127.0.0.1:5008/api/unis'; // New Uni Service
 
 // Data Storage
+let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 let students = [];
 let courses = [];
 let grades = []; // This will hold enrollments
@@ -22,27 +25,373 @@ let editingFacultyId = null;
 let editingMajorId = null;
 let editingSchoolId = null;
 
-// Knowledge Blocks data structure
-let majorKnowledgeBlocksData = {
-    'cso_nganh': { name: 'Khối kiến thức cơ sở ngành', courses: [] },
-    'bo_tro': { name: 'Khối kiến thức bổ trợ', courses: [] },
-    'giao_duc_dai_cuong': { name: 'Khối kiến thức giáo dục đại cương', courses: [] },
-    'chuyen_nganh': { name: 'Khối kiến thức chuyên ngành', courses: [] },
-    'thuc_tap': { name: 'Khối thực tập', courses: [] }
-};
-
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+});
+
+function initApp() {
+    console.log("App initialized. Current user:", currentUser);
+    if (currentUser) {
+        checkStudentProfileAndShow();
+    } else {
+        showLogin();
+    }
+    
+    // Add Login Form Listener
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    // Add Register Form Listeners
+    const regForm1 = document.getElementById('register-form-step-1');
+    if (regForm1) {
+        regForm1.addEventListener('submit', handleRegisterStep1);
+    }
+    const regForm2 = document.getElementById('register-form-step-2');
+    if (regForm2) {
+        regForm2.addEventListener('submit', handleRegisterStep2);
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('register-screen').style.display = 'none';
+    document.getElementById('app-container').style.display = 'none';
+}
+
+function showRegister() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('register-screen').style.display = 'flex';
+    document.getElementById('app-container').style.display = 'none';
+    showRegStep(1);
+}
+
+function showRegStep(step) {
+    const step1 = document.getElementById('reg-step-1');
+    const step2 = document.getElementById('reg-step-2');
+    const title = document.getElementById('register-title');
+    const backBtn = document.getElementById('reg-back-btn');
+    
+    if (step === 1) {
+        step1.style.display = 'block';
+        step2.style.display = 'none';
+        title.textContent = 'Đăng ký tài khoản (1/2)';
+        if (backBtn) backBtn.style.display = 'block';
+    } else {
+        step1.style.display = 'none';
+        step2.style.display = 'block';
+        title.textContent = 'Thông tin cá nhân (2/2)';
+        
+        // Populate email from session if possible
+        if (currentUser) {
+            const emailField = document.getElementById('reg-gmail');
+            if (emailField) emailField.value = currentUser.email || currentUser.user;
+            if (backBtn) backBtn.style.display = 'none';
+        }
+    }
+}
+
+async function checkStudentProfileAndShow() {
+    if (!currentUser) return showLogin();
+
+    if (currentUser.role === 'Student') {
+        try {
+            const res = await fetch(`${API_STUDENTS}/${currentUser.user || currentUser.email}`);
+            if (res.status === 404) {
+                // Info missing! Show Step 2
+                showToast('Vui lòng hoàn tất thông tin cá nhân', 'info');
+                showRegStep(2);
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('register-screen').style.display = 'flex';
+                document.getElementById('app-container').style.display = 'none';
+                return;
+            }
+        } catch (e) {
+            console.error("Profile check failed:", e);
+        }
+    }
+    showApp();
+}
+
+function showApp() {
+    if (!currentUser) return showLogin();
+    
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('register-screen').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    
+    updateUserDisplayName();
+    
+    applyRolePermissions();
+    
     loadStudents();
     loadCourses();
     loadGrades();
     loadFaculties();
     loadMajors();
     loadGeneralInfo();
-});
+    
+    // Default page based on role
+    if (currentUser.role === 'Admin') {
+        showPage('general-info');
+    } else if (currentUser.role === 'Faculty') {
+        showPage('grades');
+    } else {
+        showPage('general-info-view');
+    }
+}
+
+function updateUserDisplayName() {
+    const userNameDisplay = document.getElementById('display-user-name');
+    if (userNameDisplay && currentUser) {
+        // Find name from students list if it's a student
+        let displayName = currentUser.user;
+        if (currentUser.role === 'Student' && students.length > 0) {
+            const student = students.find(s => String(s.id) === String(currentUser.user) || s.email === (currentUser.email || currentUser.user));
+            if (student) {
+                displayName = student.name;
+                // Update the user identifier to actual Student ID for DB queries if it was an email
+                if (String(currentUser.user) !== String(student.id)) {
+                    console.log("Syncing currentUser.user from email to student ID:", student.id);
+                    currentUser.user = student.id;
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                }
+            }
+        }
+        userNameDisplay.textContent = `${displayName || 'Unknown'} (${currentUser.role || 'No Role'})`;
+    }
+}
+
+function getCurrentStudentId() {
+    if (!currentUser) return null;
+    if (currentUser.role !== 'Student') return currentUser.user;
+    
+    // If students list is loaded, try to resolve email to ID
+    if (students.length > 0) {
+        const student = students.find(s => String(s.id) === String(currentUser.user) || s.email === (currentUser.email || currentUser.user));
+        if (student) return student.id;
+    }
+    return currentUser.user;
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    console.log("Attempting login for:", username);
+
+    try {
+        const res = await fetch(API_IDENTITY, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            console.log("Login success:", data);
+            currentUser = data;
+            
+            localStorage.setItem('user', JSON.stringify(data));
+            showToast('Đăng nhập thành công');
+            checkStudentProfileAndShow();
+        } else {
+            const errData = await res.json();
+            console.error("Login failed:", errData);
+            showToast('Đăng nhập thất bại', 'error');
+        }
+    } catch (err) {
+        console.error("Connection error:", err);
+        showToast('Đăng nhập thất bại', 'error');
+    }
+}
+
+async function handleRegisterStep1(e) {
+    e.preventDefault();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value.trim();
+
+    if (password.length < 3) {
+        showToast('Mật khẩu phải có ít nhất 3 ký tự', 'warning');
+        return;
+    }
+
+    try {
+        // 1. Create Identity User immediately
+        const resUser = await fetch(API_USERS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                username: email, 
+                password: password, 
+                email: email,
+                role: 'Student' 
+            })
+        });
+
+        if (!resUser.ok) {
+            const err = await resUser.json();
+            throw new Error(err.error || 'Email này đã được sử dụng hoặc có lỗi xảy ra');
+        }
+
+        showToast('Đăng ký tài khoản thành công! Mời bạn đăng nhập.');
+        showLogin();
+    } catch (err) {
+        console.error("Step 1 error:", err);
+        showToast(err.message, 'error');
+    }
+}
+
+async function handleRegisterStep2(e) {
+    e.preventDefault();
+    
+    if (!currentUser) return showLogin();
+    
+    const email = currentUser.email || currentUser.user;
+    
+    // Data from Step 2
+    const msv = document.getElementById('reg-msv').value.trim();
+    const name = document.getElementById('reg-name').value.trim();
+    const gender = document.getElementById('reg-gender').value;
+    const dob = document.getElementById('reg-dob').value;
+    const cohort = document.getElementById('reg-cohort').value.trim();
+    const studentClass = document.getElementById('reg-class').value.trim();
+
+    try {
+        // First, check if this MSV already exists to avoid duplicate error
+        const checkMsv = await fetch(`${API_STUDENTS}/${msv}`);
+        let method = 'POST';
+        let url = API_STUDENTS;
+
+        if (checkMsv.ok) {
+            const existingData = await checkMsv.json();
+            // If MSV exists and is linked to another email
+            if (existingData.student_email && existingData.student_email !== email) {
+                throw new Error('Mã sinh viên này đã được đăng ký bởi tài khoản khác!');
+            }
+            // If it matches or is empty, we update instead
+            method = 'PUT';
+            url = `${API_STUDENTS}/${msv}`;
+        }
+
+        // 2. Create or Update Student Record
+        const resStudent = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                student_id: msv, 
+                student_name: name,
+                student_email: email,
+                gender: gender,
+                date_of_birth: dob,
+                cohort: cohort,
+                student_class: studentClass
+            })
+        });
+
+        if (!resStudent.ok) {
+            const err = await resStudent.json();
+            throw new Error(err.error || 'Lỗi khi lưu thông tin sinh viên');
+        }
+
+        showToast('Cập nhật thông tin thành công!');
+        
+        // Update local session with the new MSV as 'user' if needed
+        // but identity service still knows them by email/orig username.
+        // For convenience, let's refresh page or current user.
+        
+        // Sync the MSV back to the Identity Service users table so login via MSV works too?
+        // Let's at least update the local current student ID.
+        currentUser.user = msv; 
+        localStorage.setItem('user', JSON.stringify(currentUser));
+
+        // Clear forms
+        document.getElementById('register-form-step-1').reset();
+        document.getElementById('register-form-step-2').reset();
+        
+        showApp();
+        
+    } catch (err) {
+        console.error("Registration Phase 2 error:", err);
+        showToast(err.message, 'error');
+    }
+}
+
+function logout() {
+    currentUser = null;
+    localStorage.removeItem('user');
+    showLogin();
+}
+
+function applyRolePermissions() {
+    if (!currentUser || !currentUser.role) {
+        console.warn("No user or role found for permissions");
+        return;
+    }
+    const role = currentUser.role;
+    
+    // Hide all role-specific items
+    document.querySelectorAll('.admin-only, .faculty-only, .student-only, .common-view, .admin-faculty-only').forEach(el => {
+        el.style.display = 'none';
+    });
+
+    if (role === 'Admin') {
+        document.querySelectorAll('.admin-only, .common-view, .admin-faculty-only').forEach(el => el.style.display = 'block');
+    } else if (role === 'Faculty') {
+        document.querySelectorAll('.faculty-only, .common-view, .admin-faculty-only').forEach(el => el.style.display = 'block');
+    } else if (role === 'Student') {
+        document.querySelectorAll('.student-only, .common-view').forEach(el => el.style.display = 'block');
+    }
+    
+    // Also update visibility of action buttons in tables
+    const tableActions = document.querySelectorAll('.action-btns');
+    tableActions.forEach(el => {
+        // This is tricky because tables are re-rendered. 
+        // Better to handle this inside render functions.
+    });
+}
+
+// Map roles to CSS classes for hiding/showing Edit/Delete buttons in tables
+function getActionButtonsVisibilityClass() {
+    return currentUser && currentUser.role === 'Admin' ? '' : 'style="display:none"';
+}
+
 
 
 // Toast Notification
+let confirmCallback = null;
+
+function showConfirm(title, message, callback) {
+    const modal = document.getElementById('confirmModal');
+    const titleEl = document.getElementById('confirmTitle');
+    const msgEl = document.getElementById('confirmMessage');
+    const okBtn = document.getElementById('confirmOkBtn');
+
+    if (modal && titleEl && msgEl && okBtn) {
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        modal.style.display = 'block';
+        confirmCallback = callback;
+        
+        okBtn.onclick = () => {
+            closeConfirmModal(true);
+        };
+    }
+}
+
+function closeConfirmModal(result) {
+    const modal = document.getElementById('confirmModal');
+    if (modal) modal.style.display = 'none';
+    
+    if (result && confirmCallback) {
+        confirmCallback();
+    }
+    confirmCallback = null;
+}
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById("toast");
     let className = "show";
@@ -74,14 +423,10 @@ function showPage(pageId) {
         if (window.event.target.classList.contains('nav-btn')) {
              window.event.target.classList.add('active');
         } else {
-             // Find array index or select by id logic if needed, 
-             // but simpler: just find the button that calls this pageId
-             // This part was 'event.target.classList.add' in original which relies on global event
              const btn = document.querySelector(`button[onclick="showPage('${pageId}')"]`);
              if (btn) btn.classList.add('active');
         }
     } else {
-         // Fallback for manual calls (initial load maybe?)
          const btn = document.querySelector(`button[onclick="showPage('${pageId}')"]`);
          if (btn) btn.classList.add('active');
     }
@@ -90,6 +435,10 @@ function showPage(pageId) {
         updateDashboard();
     } else if (pageId === 'grades') {
         updateGradeSelects();
+    } else if (pageId === 'enrollment') {
+        loadEnrollmentData();
+    } else if (pageId === 'student-grades') {
+        loadStudentResults();
     }
 }
 
@@ -142,7 +491,24 @@ async function loadStudents() {
         const res = await fetch(API_STUDENTS);
         if (!res.ok) throw new Error('Failed to fetch students');
         const data = await res.json();
-        // Map API data to local structure if needed (API returns snake_case usually, but let's check keys)
+        
+        // Fetch users to filter only those who have an account
+        let registeredEmails = new Set();
+        let registeredUsernames = new Set();
+        try {
+            const resUsers = await fetch(API_USERS);
+            if (resUsers.ok) {
+                const usersData = await resUsers.json();
+                usersData.forEach(u => {
+                    if (u.email) registeredEmails.add(u.email.toLowerCase());
+                    if (u.username) registeredUsernames.add(u.username.toLowerCase());
+                });
+            }
+        } catch (uErr) {
+            console.warn("Could not fetch user list for filtering:", uErr);
+        }
+
+        // Map API data
         students = data.map(s => ({
             id: s.student_id,
             // Support both old and new keys for transition or if service rolls back
@@ -153,8 +519,10 @@ async function loadStudents() {
             email: s.student_email || s.email || '',
             cohort: s.cohort || ''
         }));
+            
         renderStudents();
         updateDashboard();
+        updateUserDisplayName();
     } catch (err) {
         console.error(err);
         // alert('Cannot connect to Student Service');
@@ -245,7 +613,7 @@ window.onclick = function(event) {
     const schoolModal = document.getElementById('schoolModal');
     const schoolDetailModal = document.getElementById('schoolDetailModal');
     const majorModal = document.getElementById('majorModal');
-    const courseToBlockModal = document.getElementById('courseToBlockModal');
+    const enrolledDetailsModal = document.getElementById('enrolledDetailsModal');
     
     if (event.target == studentModal) closeStudentModal();
     if (event.target == courseModal) closeCourseModal();
@@ -253,28 +621,36 @@ window.onclick = function(event) {
     if (event.target == schoolModal) closeSchoolModal();
     if (event.target == schoolDetailModal) closeSchoolDetailModal();
     if (event.target == majorModal) closeMajorModal();
-    if (event.target == courseToBlockModal) closeCourseToBlockModal();
+    if (event.target == enrolledDetailsModal) closeEnrolledDetailsModal();
 }
 
 async function deleteStudent(id) {
-    if (!confirm('Bạn có chắc muốn xóa sinh viên này?')) return;
-    try {
-        const res = await fetch(`${API_STUDENTS}/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-            showToast('Xóa sinh viên thành công');
-            loadStudents();
-        } else {
-            showToast('Xóa thất bại', 'error');
+    showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa sinh viên này?', async () => {
+        try {
+            const res = await fetch(`${API_STUDENTS}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Xóa sinh viên thành công');
+                loadStudents();
+            } else {
+                showToast('Xóa thất bại', 'error');
+            }
+        } catch (error) {
+            showToast('Lỗi kết nối: ' + error.message, 'error');
         }
-    } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message, 'error');
-    }
+    });
 }
 
 function renderStudents(data = students) {
     const tbody = document.getElementById('studentTableBody');
+    const header = document.getElementById('studentActionHeader');
+    const isAdmin = currentUser && currentUser.role === 'Admin';
+
+    if (header) {
+        header.style.display = isAdmin ? 'table-cell' : 'none';
+    }
+
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center-muted">Chưa có dữ liệu </td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 : 7}" class="text-center-muted">Chưa có dữ liệu </td></tr>`;
         return;
     }
     tbody.innerHTML = data.map(s => {
@@ -294,10 +670,11 @@ function renderStudents(data = students) {
             <td>${dobDisplay}</td>
             <td>${s.className}</td>
             <td>${s.cohort}</td>
+            ${isAdmin ? `
             <td class="action-btns">
                 <button class="action-btn btn-secondary" onclick="editStudent('${s.id}')">Sửa</button>
                 <button class="action-btn btn-danger" onclick="deleteStudent('${s.id}')">Xóa</button>
-            </td>
+            </td>` : ''}
         </tr>
     `}).join('');
 }
@@ -375,6 +752,7 @@ async function loadCourses() {
         }));
         renderCourses();
         updateDashboard();
+        updateGradeSelects(); // Sync course filter dropdown
     } catch (err) {
         console.error(err);
     }
@@ -390,20 +768,20 @@ async function addCourse() {
     const coRequisite = document.getElementById('coRequisite').value.trim();
     const previous = document.getElementById('previousCourse').value.trim();
 
-    if (!id || !name || !credits) {
-        showToast('Thiếu thông tin bắt buộc');
+    if (!id || !name) {
+        showToast('Vui lòng điền Mã học phần và Tên học phần', 'warning');
         return;
     }
 
     if (!editingCourseId && courses.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-        showToast('Tên học phần đã tồn tại! Vui lòng chọn tên khác.');
+        showToast('Tên học phần đã tồn tại! Vui lòng chọn tên khác.', 'warning');
         return;
     }
 
     const payload = {
         course_id: id,
         course_name: name,
-        total_credits: parseInt(credits),
+        total_credits: credits ? parseInt(credits) : 0,
         theory_credits: theory ? parseInt(theory) : 0,
         practical_credits: practical ? parseInt(practical) : 0,
         prerequisite: prerequisite,
@@ -464,10 +842,11 @@ function renderCourses(data = courses) {
             <td>${getName(c.prerequisite)}</td>
             <td>${getName(c.coRequisite)}</td>
             <td>${getName(c.previous)}</td>
+            ${currentUser.role === 'Admin' ? `
             <td class="action-btns">
                 <button class="action-btn btn-secondary" onclick="editCourse('${c.id}')">Sửa</button>
                 <button class="action-btn btn-danger" onclick="deleteCourse('${c.id}')">Xóa</button>
-            </td>
+            </td>` : '<td></td>'}
         </tr>
     `).join('');
 }
@@ -547,18 +926,19 @@ function editCourse(id) {
     document.getElementById('courseModal').style.display = 'block';
 }
 async function deleteCourse(id) { 
-    if (!confirm('Bạn có chắc muốn xóa học phần này?')) return;
-    try {
-        const res = await fetch(`${API_COURSES}/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-            showToast('Xóa học phần thành công');
-            loadCourses();
-        } else {
-            showToast('Xóa thất bại');
+    showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa học phần này?', async () => {
+        try {
+            const res = await fetch(`${API_COURSES}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Xóa học phần thành công');
+                loadCourses();
+            } else {
+                showToast('Xóa thất bại');
+            }
+        } catch (error) {
+            showToast('Lỗi kết nối: ' + error.message);
         }
-    } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message);
-    }
+    });
 }
 function searchCourses() {
     const searchTerm = document.getElementById('searchCourse').value.toLowerCase();
@@ -588,14 +968,20 @@ async function loadGrades() {
         if (!res.ok) throw new Error('Failed to fetch enrollments');
         const data = await res.json();
         // data is list of enrollments
-        grades = data.map(e => ({
-            id: e.enrollment_id, // Important for PUT
-            studentId: e.student_id,
-            courseId: e.course_code,
-            grade: e.grade, // Final grade
-            created_at: e.enrollment_date
-            // Note: scores components might be in e.component_scores dict
-        }));
+        grades = data.map(e => {
+            const scores = e.component_scores || {};
+            return {
+                id: e.grade_id || e.enrollment_id,
+                studentId: e.student_id,
+                courseId: e.course_id || e.course_code,
+                grade: e.grade,
+                attendance1: scores.attendance1,
+                attendance2: scores.attendance2,
+                midterm: scores.midterm,
+                final: scores.final,
+                created_at: e.enrollment_date
+            };
+        });
         renderGrades();
         updateDashboard();
     } catch (err) {
@@ -606,7 +992,8 @@ async function loadGrades() {
 async function addGrade() {
     const studentId = document.getElementById('gradeStudentId').value;
     const courseId = document.getElementById('gradeCourseId').value;
-    const attendance = parseFloat(document.getElementById('gradeAttendance').value) || 0;
+    const attendance1 = parseFloat(document.getElementById('gradeAttendance1').value) || 0;
+    const attendance2 = parseFloat(document.getElementById('gradeAttendance2').value) || 0;
     const midterm = parseFloat(document.getElementById('gradeMidterm').value) || 0;
     const final = parseFloat(document.getElementById('gradeFinal').value);
 
@@ -645,14 +1032,11 @@ async function addGrade() {
     // Now update grade
     if (enrollmentId && !isNaN(final)) {
         try {
-            // Using weighted average logic from backend: needs 'scores' and 'weights'
-            // Or just 'grade' if we want to override final directly. 
-            // Let's send components to let backend calculate? 
-            // Backend supports 'scores' list. Let's say [attendance, midterm, final]
-            // And weights [10, 40, 50]
+            // Using weighted average logic from backend
+            // Sending all 4 scores
             const payload = {
-                scores: [attendance, midterm, final],
-                weights: [10, 40, 50]
+                scores: [attendance1, attendance2, midterm, final],
+                weights: [5, 5, 40, 50] // Adjusted for 2 attendance scores
             };
             
             const res = await fetch(`${API_GRADES}/${enrollmentId}`, {
@@ -663,7 +1047,7 @@ async function addGrade() {
             
             if (res.ok) {
                 showToast('Nhập điểm thành công!');
-                clearGradeForm();
+                closeGradeModal();
                 loadGrades();
             } else {
                 const err = await res.json();
@@ -673,55 +1057,124 @@ async function addGrade() {
             showToast('Lỗi kết nối khi nhập điểm');
         }
     } else {
-            showToast('Đăng ký môn thành công (Chưa có điểm final để tính)');
+            showToast('Đăng ký môn thành công');
+            closeGradeModal();
             loadGrades();
     }
+}
+
+function openGradeModal() {
+    editingGradeId = null;
+    clearGradeForm();
+    updateGradeSelects();
+    document.getElementById('gradeModal').style.display = 'block';
+}
+
+function closeGradeModal() {
+    document.getElementById('gradeModal').style.display = 'none';
+}
+
+function editGrade(id) {
+    editingGradeId = id;
+    const g = grades.find(item => item.id == id);
+    if (!g) return;
+
+    updateGradeSelects();
+    
+    document.getElementById('gradeCourseId').value = g.courseId;
+    onGradeCourseChange(); // Populate students for this course
+    document.getElementById('gradeStudentId').value = g.studentId;
+    
+    document.getElementById('gradeAttendance1').value = g.attendance1 || '';
+    document.getElementById('gradeAttendance2').value = g.attendance2 || '';
+    document.getElementById('gradeMidterm').value = g.midterm || '';
+    document.getElementById('gradeFinal').value = g.final || '';
+
+    document.getElementById('gradeModal').style.display = 'block';
 }
 
 function renderGrades(data = grades) {
     const tbody = document.getElementById('gradeTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center-muted">Chưa có dữ liệu</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center-muted">Chưa có dữ liệu</td></tr>';
         return;
     }
 
-    tbody.innerHTML = data.map(g => {
-        // Local lookup for names (optimization: could fetching names be better?)
-        const s = students.find(st => st.id === g.studentId) || { name: g.studentId };
-        const c = courses.find(co => co.id === g.courseId) || { name: g.courseId };
-        const gradeDisplay = (g.grade !== null) ? parseFloat(g.grade).toFixed(2) : '-';
+    // Group by course
+    const grouped = data.reduce((acc, g) => {
+        if (!acc[g.courseId]) acc[g.courseId] = [];
+        acc[g.courseId].push(g);
+        return acc;
+    }, {});
+
+    let html = '';
+    for (const courseId in grouped) {
+        const course = courses.find(c => String(c.id) === String(courseId)) || { name: courseId };
         
-        return `
-        <tr>
-            <td>${g.studentId}</td>
-            <td>${s.name}</td>
-            <td>${g.courseId}</td>
-            <td>${c.name}</td>
-            <td>-</td> 
-            <td>-</td> 
-            <td>-</td> 
-            <td>${gradeDisplay}</td>
-            <td class="action-btns">
-                <button class="action-btn btn-danger" onclick="deleteGrade('${g.id}')">Hủy</button>
+        // Course Header Row
+        html += `
+        <tr style="background-color: #f8fafc; font-weight: bold;">
+            <td colspan="8" style="color: var(--primary); padding: 12px 24px; border-left: 4px solid var(--primary);">
+                <i class="fas fa-book-open"></i> Học phần: ${course.name} (${courseId}) - ${grouped[courseId].length} sinh viên
             </td>
-        </tr>
-        `;
-    }).join('');
+        </tr>`;
+
+        // Student Rows
+        html += grouped[courseId].map(g => {
+            const s = students.find(st => String(st.id) === String(g.studentId));
+            const studentName = s ? s.name : `Chưa cập nhật (Mã: ${g.studentId})`;
+            
+            const isEntered = (val) => (val !== null && val !== undefined && parseFloat(val) !== 0);
+            const formatScore = (val) => isEntered(val) ? val : '-';
+            const gradeDisplay = isEntered(g.grade) ? parseFloat(g.grade).toFixed(2) : '-';
+            
+            return `
+            <tr>
+                <td>${g.studentId}</td>
+                <td>${studentName}</td>
+                <td>${formatScore(g.attendance1)}</td> 
+                <td>${formatScore(g.attendance2)}</td> 
+                <td>${formatScore(g.midterm)}</td> 
+                <td>${formatScore(g.final)}</td>
+                <td>${gradeDisplay}</td>
+                ${(currentUser.role === 'Admin' || currentUser.role === 'Faculty') ? `
+                <td class="action-btns">
+                    <button class="action-btn btn-secondary" onclick="editGrade('${g.id}')">Sửa</button>
+                    <button class="action-btn btn-danger" onclick="deleteGrade('${g.id}')">Hủy</button>
+                </td>` : '<td></td>'}
+            </tr>`;
+        }).join('');
+    }
+    tbody.innerHTML = html;
 }
 
 async function deleteGrade(id) {
-        if (!confirm('Hủy đăng ký học phần này?')) return;
+    showConfirm('Xác nhận', 'Hủy đăng ký học phần này?', async () => {
         try {
-        const res = await fetch(`${API_ENROLLMENTS_SVC}/${id}`, { method: 'DELETE' });
-        if (res.ok) loadGrades();
-        else showToast('Lỗi khi hủy');
+            const res = await fetch(`${API_ENROLLMENTS_SVC}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Hủy đăng ký thành công');
+                loadGrades();
+                // Refresh enrollment data to show the course back in available list
+                setTimeout(loadEnrollmentData, 500);
+                setTimeout(loadStudentResults, 500);
+                
+                // If enrolled details modal is open, refresh it
+                const modal = document.getElementById('enrolledDetailsModal');
+                if (modal && modal.style.display === 'block') {
+                    setTimeout(showEnrolledDetails, 600); 
+                }
+            }
+            else showToast('Lỗi khi hủy');
         } catch(e) { showToast('Lỗi kết nối'); }
+    });
 }
 
 function clearGradeForm() {
     document.getElementById('gradeStudentId').value = '';
     document.getElementById('gradeCourseId').value = '';
-    document.getElementById('gradeAttendance').value = '';
+    document.getElementById('gradeAttendance1').value = '';
+    document.getElementById('gradeAttendance2').value = '';
     document.getElementById('gradeMidterm').value = '';
     document.getElementById('gradeFinal').value = '';
 }
@@ -729,27 +1182,62 @@ function clearGradeForm() {
 function updateGradeSelects() {
     const studentSelect = document.getElementById('gradeStudentId');
     const courseSelect = document.getElementById('gradeCourseId');
+    const filterCourseSelect = document.getElementById('filterGradeByCourse');
     
-    studentSelect.innerHTML = '<option value="">-- Chọn sinh viên --</option>' + 
-        students.map(s => `<option value="${s.id}">${s.id} - ${s.name}</option>`).join('');
-        
-    courseSelect.innerHTML = '<option value="">-- Chọn học phần --</option>' + 
-        courses.map(c => `<option value="${c.id}">${c.id} - ${c.name}</option>`).join('');
+    const courseOptions = courses.map(c => `<option value="${c.id}">${c.id} - ${c.name}</option>`);
+    
+    // Always show all courses
+    const commonPrefix = '<option value="">-- Chọn học phần --</option>';
+    courseSelect.innerHTML = commonPrefix + courseOptions.join('');
+
+    // Update filter dropdown too
+    if (filterCourseSelect) {
+        filterCourseSelect.innerHTML = '<option value="">-- Tất cả học phần --</option>' + courseOptions.join('');
+    }
+
+    // Students will be populated based on selected course
+    onGradeCourseChange();
+}
+
+function onGradeCourseChange() {
+    const courseId = document.getElementById('gradeCourseId').value;
+    const studentSelect = document.getElementById('gradeStudentId');
+    
+    if (!courseId) {
+        studentSelect.innerHTML = '<option value="">-- Chọn sinh viên --</option>';
+        return;
+    }
+
+    // Filter students who registered for this course
+    const enrolledStudentIds = grades
+        .filter(g => String(g.courseId) === String(courseId))
+        .map(g => g.studentId);
+    
+    const filteredStudents = students.filter(s => enrolledStudentIds.includes(s.id));
+
+    if (filteredStudents.length === 0) {
+        studentSelect.innerHTML = '<option value="">-- Chưa có SV đăng ký HP này --</option>';
+    } else {
+        studentSelect.innerHTML = '<option value="">-- Chọn sinh viên --</option>' + 
+            filteredStudents.map(s => `<option value="${s.id}">${s.id} - ${s.name}</option>`).join('');
+    }
 }
 
 function searchGrades() {
     const searchTerm = document.getElementById('searchGrade').value.toLowerCase();
     const filterCol = document.getElementById('filterColumnGrade').value;
+    const filterCourse = document.getElementById('filterGradeByCourse').value;
 
     const filtered = grades.filter(g => {
         const matchesTerm = (val) => val && String(val).toLowerCase().includes(searchTerm);
+        const matchesCourse = !filterCourse || String(g.courseId) === String(filterCourse);
         
+        if (!matchesCourse) return false;
+
         if (filterCol === 'all') {
-            return matchesTerm(g.studentId) || matchesTerm(g.courseId);
+            return matchesTerm(g.studentId);
         } else if (filterCol === 'studentId') {
             return matchesTerm(g.studentId);
-        } else if (filterCol === 'courseId') {
-            return matchesTerm(g.courseId);
         }
         return true;
     });
@@ -770,48 +1258,57 @@ async function loadGeneralInfo() {
         const rawSchools = await res.json();
         
         // Map Uni Service format to frontend friendly format
-        const schools = rawSchools.map(s => ({
+        const schoolsData = rawSchools.map(s => ({
             id: s.mem_school_id,
             name: s.mem_school_name,
-            website: s.mem_school_websit
+            website: s.mem_school_website
         }));
         
-        const container = document.getElementById('school-info-section');
-        if (!container) return;
-
-        if (!schools || schools.length === 0) {
-            container.innerHTML = '<p class="text-center-muted">Chưa có thông tin trường</p>';
-            return;
-        }
-
-        container.innerHTML = schools.map(s => `
-            <div style="background: white; padding: 25px; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 20px; border-left: 5px solid var(--secondary);">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <h2 style="margin: 0 0 15px 0; color: var(--primary); font-size: 1.5rem;">${s.name}</h2>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary btn-sm" onclick="viewSchoolDetails('${s.id}', '${s.name}')">Xem chi tiết</button>
-                        <button class="btn btn-secondary btn-sm" onclick="editSchool('${s.id}')"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteSchool('${s.id}')"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; color: var(--text-secondary);">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fa-solid fa-globe" style="color: var(--secondary);"></i> 
-                        <span>Website: <a href="${s.website}" target="_blank" style="color: var(--primary); text-decoration: none;">${s.website || '---'}</a></span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fa-solid fa-id-card" style="color: var(--secondary);"></i> 
-                        <span>Mã trường: <strong>${s.id}</strong></span>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+        schools = schoolsData; // Update global
+        
+        renderSchoolSection('school-info-section', schoolsData, true);
+        renderSchoolSection('school-info-section-view', schoolsData, false);
 
     } catch(e) {
         console.error("Error loading general info:", e);
         const container = document.getElementById('school-info-section');
         if(container) container.innerHTML = '<p class="text-center-muted">Không thể tải thông tin trường</p>';
     }
+}
+
+function renderSchoolSection(containerId, data, isManagement) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-center-muted">Chưa có thông tin trường</p>';
+        return;
+    }
+
+    container.innerHTML = data.map(s => `
+        <div style="background: white; padding: 25px; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 20px; border-left: 5px solid var(--secondary);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <h2 style="margin: 0 0 15px 0; color: var(--primary); font-size: 1.5rem;">${s.name}</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-sm" onclick="viewSchoolDetails('${s.id}', '${s.name}')">Xem chi tiết</button>
+                    ${(isManagement && currentUser.role === 'Admin') ? `
+                    <button class="btn btn-secondary btn-sm" onclick="editSchool('${s.id}')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteSchool('${s.id}')"><i class="fa-solid fa-trash"></i></button>
+                    ` : ''}
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; color: var(--text-secondary);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-globe" style="color: var(--secondary);"></i> 
+                    <span>Website: <a href="${s.website}" target="_blank" style="color: var(--primary); text-decoration: none;">${s.website || '---'}</a></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-id-card" style="color: var(--secondary);"></i> 
+                    <span>Mã trường: <strong>${s.id}</strong></span>
+                </div>
+            </div>
+        </div>
+    `).join('');
 }
 
 // --- SCHOOL MANAGEMENT ---
@@ -845,7 +1342,7 @@ async function editSchool(id) {
         document.getElementById('schoolId').value = s.mem_school_id;
         document.getElementById('schoolId').disabled = true;
         document.getElementById('schoolName').value = s.mem_school_name;
-        document.getElementById('schoolWebsite').value = s.mem_school_websit || '';
+        document.getElementById('schoolWebsite').value = s.mem_school_website || '';
         document.getElementById('schoolModal').style.display = 'block';
 
     } catch (e) {
@@ -854,24 +1351,25 @@ async function editSchool(id) {
 }
 
 async function deleteSchool(id) {
-    if(!confirm('Bạn có chắc chắn muốn xóa trường này?')) return;
-    try {
-        const res = await fetch(`${API_UNIS}/${id}`, { method: 'DELETE' });
-        if(res.ok) {
-            showToast('Xóa thành công');
-            loadGeneralInfo();
-            loadSchoolsIntoFacultyFilter();
-        } else {
-            const err = await res.json();
-            if (err.error && (err.error.includes('1451') || err.error.includes('foreign key'))) {
-                showToast('Không thể xóa: Trường này đang có các khoa trực thuộc. Vui lòng xóa các khoa trước.', 'error');
+    showConfirm('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa trường này?', async () => {
+        try {
+            const res = await fetch(`${API_UNIS}/${id}`, { method: 'DELETE' });
+            if(res.ok) {
+                showToast('Xóa thành công');
+                loadGeneralInfo();
+                loadSchoolsIntoFacultyFilter();
             } else {
-                showToast('Lỗi xóa: ' + (err.error || 'Unknown'), 'error');
+                const err = await res.json();
+                if (err.error && (err.error.includes('1451') || err.error.includes('foreign key'))) {
+                    showToast('Không thể xóa: Trường này đang có các khoa trực thuộc. Vui lòng xóa các khoa trước.', 'error');
+                } else {
+                    showToast('Lỗi xóa: ' + (err.error || 'Unknown'), 'error');
+                }
             }
+        } catch(e) {
+            showToast('Lỗi kết nối: ' + e.message, 'error');
         }
-    } catch(e) {
-        showToast('Lỗi kết nối: ' + e.message, 'error');
-    }
+    });
 }
 
 async function addSchool() {
@@ -888,7 +1386,7 @@ async function addSchool() {
         const payload = {
             mem_school_id: parseInt(id),
             mem_school_name: name,
-            mem_school_websit: website
+            mem_school_website: website
         };
 
         let res;
@@ -986,6 +1484,12 @@ async function loadSchoolsIntoFacultyFilter() {
         
         select.innerHTML = '<option value="">-- Tất cả trường --</option>';
         
+        // Add option for separate faculties
+        const optIndependent = document.createElement('option');
+        optIndependent.value = 'none';
+        optIndependent.textContent = '-- Khoa riêng biệt --';
+        select.appendChild(optIndependent);
+        
         schools.forEach(s => {
             const option = document.createElement('option');
             option.value = s.mem_school_id || s.id;
@@ -1001,7 +1505,9 @@ function filterFacultiesBySchool() {
     const schoolId = document.getElementById('filterSchool').value;
     
     let filtered = faculties;
-    if (schoolId) {
+    if (schoolId === 'none') {
+        filtered = faculties.filter(f => !f.mem_school_id);
+    } else if (schoolId) {
         filtered = faculties.filter(f => f.mem_school_id == schoolId);
     }
     
@@ -1069,7 +1575,7 @@ function renderFacultyGrid(data = faculties) {
     
     container.innerHTML = data.map(f => {
         // Get school name from schools list
-        let schoolName = f.school_name || '---';
+        let schoolName = f.school_name || 'Khoa riêng biệt';
         if (!f.school_name && f.mem_school_id && schools.length > 0) {
             const school = schools.find(s => (s.mem_school_id || s.id) == f.mem_school_id);
             if (school) {
@@ -1080,6 +1586,9 @@ function renderFacultyGrid(data = faculties) {
         return `
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
+                 <div style="margin-bottom: 8px;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">${schoolName}</span>
+                 </div>
                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--primary);">${f.fac_name}</h3>
                     <span style="font-size: 0.8rem; background: var(--bg-body); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary);">ID: ${f.fac_id}</span>
@@ -1095,12 +1604,10 @@ function renderFacultyGrid(data = faculties) {
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i class="fa-solid fa-phone" style="width: 16px;"></i> ${f.fac_number || '---'}
                     </div>
-                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-university" style="width: 16px;"></i> <strong>${schoolName}</strong>
-                    </div>
                 </div>
             </div>
             
+            ${currentUser.role === 'Admin' ? `
             <div style="border-top: 1px solid var(--border-color); padding-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
                 <button class="action-btn btn-secondary" onclick="editFaculty('${f.fac_id}')">
                     <i class="fa-solid fa-pen"></i> Sửa
@@ -1108,7 +1615,7 @@ function renderFacultyGrid(data = faculties) {
                 <button class="action-btn btn-danger" onclick="deleteFaculty('${f.fac_id}')">
                     <i class="fa-solid fa-trash"></i> Xóa
                 </button>
-            </div>
+            </div>` : ''}
         </div>
     `}).join('');
 }
@@ -1138,18 +1645,13 @@ async function addFaculty() {
         return;
     }
 
-    if (!schoolId) {
-        showToast('Vui lòng chọn Trường cho khoa này');
-        return;
-    }
-
     const payload = {
         fac_id: id,
         fac_name: name,
         fac_address: address,
         fac_email: email,
         fac_number: phone,
-        mem_school_id: schoolId
+        mem_school_id: schoolId || null
     };
 
     try {
@@ -1187,19 +1689,20 @@ async function addFaculty() {
 }
 
 async function deleteFaculty(id) {
-    if (!confirm('Bạn có chắc muốn xóa khoa này?')) return;
-    try {
-        const res = await fetch(`${API_FACULTIES}/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-            showToast('Xóa thành công');
-            loadFaculties();
-        } else {
-            const err = await res.json();
-            showToast('Lỗi xóa: ' + (err.error || 'Unknown error'), 'error');
+    showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa khoa này?', async () => {
+        try {
+            const res = await fetch(`${API_FACULTIES}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Xóa thành công');
+                loadFaculties();
+            } else {
+                const err = await res.json();
+                showToast('Lỗi xóa: ' + (err.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            showToast('Lỗi kết nối: ' + error.message, 'error');
         }
-    } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message, 'error');
-    }
+    });
 }
 
 async function openAddFacultyModal() {
@@ -1265,7 +1768,7 @@ async function loadSchoolsForFaculty(selectedId = null) {
         const schoolsList = await res.json();
 
         const select = document.getElementById('facultySchoolId');
-        select.innerHTML = '<option value="">-- Chọn Trường --</option>';
+        select.innerHTML = '<option value="">-- Không có (Khoa riêng biệt) --</option>';
         
         schoolsList.forEach(s => {
             const option = document.createElement('option');
@@ -1353,9 +1856,19 @@ function renderMajors(data = majors) {
     tbody.innerHTML = data.map(m => {
         // Find faculty name if not provided directly
         let fName = m.facName;
-        if (!fName && faculties.length > 0) {
+        let sName = '---';
+        if (faculties.length > 0) {
             const f = faculties.find(fac => fac.fac_id == m.facId);
-            if (f) fName = f.fac_name;
+            if (f) {
+                fName = f.fac_name;
+                // Get school name from its id
+                if (schools.length > 0) {
+                    const s = schools.find(sch => (sch.mem_school_id || sch.id) == f.mem_school_id);
+                    if (s) sName = s.mem_school_name || s.name;
+                } else if (f.school_name) {
+                    sName = f.school_name;
+                }
+            }
         }
         
         return `
@@ -1363,11 +1876,13 @@ function renderMajors(data = majors) {
                 <td>${m.id}</td>
                 <td>${m.name}</td>
                 <td>${m.credits || '-'}</td>
+                <td>${sName}</td>
                 <td>${fName || m.facId || '-'}</td>
                 <td class="action-btns">
                     <button class="action-btn btn-primary" onclick="openMajorKnowledgeBlocks('${m.id}')">Xem chi tiết</button>
+                    ${currentUser.role === 'Admin' ? `
                     <button class="action-btn btn-secondary" onclick="editMajor('${m.id}')">Sửa</button>
-                    <button class="action-btn btn-danger" onclick="deleteMajor('${m.id}')">Xóa</button>
+                    <button class="action-btn btn-danger" onclick="deleteMajor('${m.id}')">Xóa</button>` : ''}
                 </td>
             </tr>
         `;
@@ -1435,18 +1950,19 @@ async function addMajor() {
 }
 
 async function deleteMajor(id) {
-    if (!confirm('Bạn có chắc muốn xóa ngành học này?')) return;
-    try {
-        const res = await fetch(`${API_MAJORS}/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-            showToast('Xóa thành công');
-            loadMajors();
-        } else {
-            showToast('Xóa thất bại', 'error');
+    showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa ngành học này?', async () => {
+        try {
+            const res = await fetch(`${API_MAJORS}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Xóa thành công');
+                loadMajors();
+            } else {
+                showToast('Xóa thất bại', 'error');
+            }
+        } catch (error) {
+            showToast('Lỗi kết nối: ' + error.message, 'error');
         }
-    } catch (error) {
-        showToast('Lỗi kết nối: ' + error.message, 'error');
-    }
+    });
 }
 
 async function loadFacultiesForSelect(selectedId = null) {
@@ -1746,6 +2262,7 @@ function searchMajors() {
 
 // ===== KNOWLEDGE BLOCKS FUNCTIONS =====
 let selectedMajorForBlocks = null;
+let assignedCourseIdsInMajor = new Set();
 
 function openMajorKnowledgeBlocks(majorId) {
     selectedMajorForBlocks = majorId;
@@ -1778,6 +2295,20 @@ async function loadKnowledgeBlocks(majorId) {
         }
         
         const data = await res.json();
+        
+        // Sync total credits back to the main majors list
+        const majorIndex = majors.findIndex(m => String(m.id) === String(majorId));
+        if (majorIndex !== -1) {
+            majors[majorIndex].credits = data.total_credits;
+            renderMajors(); // Refresh the main table to reflect new credit count
+        }
+        
+        // Track assigned courses to hide them from the add list
+        assignedCourseIdsInMajor = new Set();
+        Object.values(data.knowledge_blocks).forEach(courseList => {
+            courseList.forEach(c => assignedCourseIdsInMajor.add(String(c.course_id)));
+        });
+
         renderKnowledgeBlocks(data.knowledge_blocks, data.total_credits);
     } catch (err) {
         console.error('Error loading knowledge blocks:', err);
@@ -1829,100 +2360,269 @@ function renderKnowledgeBlocks(blocks, totalCredits) {
     }
 }
 
-function openAddCourseToBlockModal() {
-    // Populate major select
-    const select = document.getElementById('blockMajorId');
-    select.innerHTML = '<option value="">-- Chọn ngành học --</option>';
-    majors.forEach(m => {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.textContent = `${m.name} (ID: ${m.id})`;
-        select.appendChild(option);
-    });
-    
-    // Set to selected major if any
-    if (selectedMajorForBlocks) {
-        select.value = selectedMajorForBlocks;
-    }
-    
-    document.getElementById('courseToBlockModal').style.display = 'block';
-}
-
-function closeCourseToBlockModal() {
-    document.getElementById('courseToBlockModal').style.display = 'none';
-    clearCourseToBlockForm();
-}
-
-function clearCourseToBlockForm() {
-    document.getElementById('blockMajorId').value = '';
-    document.getElementById('blockType').value = '';
-    document.getElementById('blockCourseId').value = '';
-    document.getElementById('blockCourseName').value = '';
-    document.getElementById('blockCourseCredits').value = '';
-}
-
-async function addCourseToBlock() {
-    const majorId = document.getElementById('blockMajorId').value.trim();
-    const blockType = document.getElementById('blockType').value.trim();
-    const courseId = document.getElementById('blockCourseId').value.trim();
-    const courseName = document.getElementById('blockCourseName').value.trim();
-    const courseCredits = document.getElementById('blockCourseCredits').value.trim();
-
-    if (!majorId || !blockType || !courseId || !courseName) {
-        showToast('Vui lòng điền tất cả thông tin bắt buộc', 'warning');
-        return;
-    }
-
-    const payload = {
-        course_id: courseId,
-        course_name: courseName,
-        course_credits: courseCredits ? parseInt(courseCredits) : 0
-    };
-
-    try {
-        const res = await fetch(`${API_MAJORS}/${majorId}/knowledge-blocks/${blockType}/courses`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            showToast('Lỗi: ' + (err.error || 'Unknown error'));
-            return;
-        }
-
-        showToast('Thêm học phần thành công');
-        closeCourseToBlockModal();
-        loadKnowledgeBlocks(majorId);
-    } catch (err) {
-        showToast('Lỗi kết nối: ' + err.message);
-    }
-}
-
 async function removeCourseFromBlock(majorId, blockType, courseId) {
-    if (!confirm('Bạn có chắc muốn xóa học phần này khỏi khối kiến thức?')) return;
+    showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa học phần này khỏi khối kiến thức?', async () => {
+        try {
+            const res = await fetch(`${API_MAJORS}/${majorId}/knowledge-blocks/${blockType}/courses/${courseId}`, {
+                method: 'DELETE'
+            });
 
-    try {
-        const res = await fetch(`${API_MAJORS}/${majorId}/knowledge-blocks/${blockType}/courses/${courseId}`, {
-            method: 'DELETE'
-        });
+            if (!res.ok) {
+                const err = await res.json();
+                showToast('Lỗi: ' + (err.error || 'Unknown error'));
+                return;
+            }
 
-        if (!res.ok) {
-            const err = await res.json();
-            showToast('Lỗi: ' + (err.error || 'Unknown error'));
-            return;
+            showToast('Xóa học phần thành công');
+            loadKnowledgeBlocks(majorId);
+        } catch (err) {
+            showToast('Lỗi kết nối: ' + err.message);
         }
-
-        showToast('Xóa học phần thành công');
-        loadKnowledgeBlocks(majorId);
-    } catch (err) {
-        showToast('Lỗi kết nối: ' + err.message);
-    }
+    });
 }
 
 // ===== END KNOWLEDGE BLOCKS FUNCTIONS =====
  
 // --- KKT Logic Removed ---
+
+// --- STUDENT FEATURES ---
+
+function showEnrolledDetails() {
+    const currentId = getCurrentStudentId();
+    const myEnrollments = grades.filter(g => String(g.studentId) === String(currentId));
+    const tbody = document.getElementById('enrolledCoursesTableBody');
+    
+    if (!tbody) return;
+    
+    if (myEnrollments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center-muted">Chưa đăng ký học phần nào</td></tr>';
+    } else {
+        tbody.innerHTML = myEnrollments.map(g => {
+            const course = courses.find(c => String(c.id) === String(g.courseId));
+            return `
+                <tr>
+                    <td>${g.courseId}</td>
+                    <td>${course ? course.name : 'Unknown'}</td>
+                    <td>${course ? course.credits : '-'}</td>
+                    <td>
+                        <button class="action-btn btn-danger" onclick="deleteGrade('${g.id}')">Hủy</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    document.getElementById('enrolledDetailsModal').style.display = 'block';
+}
+
+function closeEnrolledDetailsModal() {
+    const modal = document.getElementById('enrolledDetailsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadEnrollmentData() {
+    const tbody = document.getElementById('enrollmentTableBody');
+    if (!tbody) return;
+
+    const currentId = getCurrentStudentId();
+    // Filter courses that students can enroll in
+    const studentGrades = grades.filter(g => String(g.studentId) === String(currentId));
+    const enrolledCourseIds = studentGrades.map(g => String(g.courseId));
+
+    // Calculate stats
+    let totalCredits = 0;
+    let enrolledCount = 0;
+
+    courses.forEach(c => {
+        if (enrolledCourseIds.includes(String(c.id))) {
+            totalCredits += (parseInt(c.credits) || 0);
+            enrolledCount++;
+        }
+    });
+
+    // Update UI stats
+    const countEl = document.getElementById('enrolled-classes-count');
+    const creditsEl = document.getElementById('enrolled-credits-sum');
+    if (countEl) countEl.innerText = enrolledCount;
+    if (creditsEl) creditsEl.innerText = totalCredits;
+
+    // Filter OUT enrolled courses from the list
+    const availableCourses = courses.filter(c => !enrolledCourseIds.includes(String(c.id)));
+
+    if (availableCourses.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center-muted">Bạn đã đăng ký tất cả học phần hiện có</td></tr>';
+    } else {
+        tbody.innerHTML = availableCourses.map(c => `
+            <tr>
+                <td>${c.id}</td>
+                <td>${c.name}</td>
+                <td>${c.credits}</td>
+                <td><span class="badge badge-secondary">Chưa đăng ký</span></td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="enrollCourse('${c.id}')">Đăng ký</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+
+async function enrollCourse(courseId) {
+    const course = courses.find(c => c.id == courseId);
+    const courseName = course ? course.name : courseId;
+    
+    // Resolve actual Student ID (MSV)
+    let targetStudentId = currentUser.user;
+    const student = students.find(s => s.id === currentUser.user || s.email === (currentUser.email || currentUser.user));
+    if (student) {
+        targetStudentId = student.id;
+        // Also sync it to currentUser for future calls in this session
+        if (currentUser.user !== student.id) {
+            currentUser.user = student.id;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            updateUserDisplayName();
+        }
+    }
+    
+    const studentName = student ? student.name : targetStudentId;
+
+    showConfirm('Xác nhận đăng ký', `Bạn có chắc chắn muốn đăng ký học phần "${courseName}"?`, async () => {
+        try {
+            const res = await fetch(API_ENROLLMENTS_SVC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_id: targetStudentId,
+                    course_code: courseId
+                })
+            });
+
+            if (res.ok) {
+                showToast(`Đăng ký học phần ${courseName} thành công`);
+                loadGrades();
+                setTimeout(loadEnrollmentData, 500); 
+                setTimeout(loadStudentResults, 500);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('Lỗi khi đăng ký: ' + (err.error || 'Có thể bạn đã đăng ký học phần này rồi'), 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối', 'error');
+        }
+    });
+}
+
+function loadStudentResults() {
+    const tbody = document.getElementById('studentGradesTableBody');
+    if (!tbody) return;
+
+    const currentId = getCurrentStudentId();
+    const myGrades = grades.filter(g => String(g.studentId) === String(currentId));
+    if (myGrades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center-muted">Chưa có kết quả học tập</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = myGrades.map(g => {
+        const c = courses.find(co => co.id === g.courseId) || { name: g.courseId, credits: 0 };
+        
+        // Helper to check if a score is actually entered (not null/undefined/0)
+        const isEntered = (val) => (val !== null && val !== undefined && parseFloat(val) !== 0);
+
+        const hasGrade = isEntered(g.grade);
+        let avg = hasGrade ? parseFloat(g.grade).toFixed(2) : '-';
+        let letter = '-';
+        
+        if (hasGrade) {
+            // Rule: Nếu điểm giữa kì hoặc cuối kì bằng 0 thì đánh giá F
+            // Chỉ áp dụng nếu đã có điểm thành phần (giá trị 0 thực sự)
+            if (parseFloat(g.midterm) === 0 || parseFloat(g.final) === 0) {
+                letter = 'F';
+                avg = '0.00 (Liệt GK/CK)';
+            } else {
+                letter = convertToLetter(parseFloat(g.grade));
+            }
+        }
+
+        const formatScore = (val) => isEntered(val) ? val : '-';
+
+        return `
+            <tr>
+                <td>${g.courseId}</td>
+                <td>${c.name}</td>
+                <td>${c.credits}</td>
+                <td>${formatScore(g.attendance1)}</td>
+                <td>${formatScore(g.attendance2)}</td>
+                <td>${formatScore(g.midterm)}</td>
+                <td>${formatScore(g.final)}</td>
+                <td><strong>${avg}</strong></td>
+                <td><span class="badge ${letter === '-' ? 'badge-secondary' : (letter === 'F' ? 'badge-danger' : 'badge-success')}">${letter}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function convert10To4(gpa10) {
+    if (gpa10 >= 8.5) return 4.0;
+    if (gpa10 >= 8.0) return 3.5;
+    if (gpa10 >= 7.0) return 3.0;
+    if (gpa10 >= 6.5) return 2.5;
+    if (gpa10 >= 5.5) return 2.0;
+    if (gpa10 >= 5.0) return 1.5;
+    if (gpa10 >= 4.0) return 1.0;
+    return 0.0;
+}
+
+function calculateComponentGrade() {
+    const method = document.getElementById('calcWeightMethod').value;
+    const s1 = parseFloat(document.getElementById('calcScore1').value) || 0;
+    const s2 = parseFloat(document.getElementById('calcScore2').value) || 0;
+    const s3 = parseFloat(document.getElementById('calcScore3').value) || 0;
+    const s4 = parseFloat(document.getElementById('calcScore4').value) || 0;
+
+    let weights = [];
+    if (method === '5-5-40-50') {
+        weights = [0.05, 0.05, 0.40, 0.50];
+    } else if (method === '5-5-30-60') {
+        weights = [0.05, 0.05, 0.30, 0.60];
+    }
+
+    const final10 = (s1 * weights[0]) + (s2 * weights[1]) + (s3 * weights[2]) + (s4 * weights[3]);
+    
+    // Nếu điểm giữa kì hoặc cuối kì bằng 0 thì đánh giá F và hệ 4 là 0.0
+    let final4, letterGrade;
+    if (s3 === 0 || s4 === 0) {
+        final4 = 0.0;
+        letterGrade = "F";
+    } else {
+        final4 = convert10To4(final10);
+        letterGrade = convertToLetter(final10);
+    }
+
+    const resultDiv = document.getElementById('component-calc-result');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+        <h4 style="margin-bottom: 10px; color: var(--primary);">Kết quả dự kiến:</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>Điểm hệ 10: <span style="font-size: 1.2rem; font-weight: bold;">${final10.toFixed(2)}</span></div>
+            <div>Điểm hệ 4: <span style="font-size: 1.2rem; font-weight: bold;">${final4.toFixed(1)}</span></div>
+            <div>Điểm chữ: <span style="font-size: 1.2rem; font-weight: bold;">${letterGrade}</span></div>
+        </div>
+    `;
+}
+
+function convertToLetter(gpa10) {
+    if (gpa10 >= 8.5) return "A";
+    if (gpa10 >= 8.0) return "B+";
+    if (gpa10 >= 7.0) return "B";
+    if (gpa10 >= 6.5) return "C+";
+    if (gpa10 >= 5.5) return "C";
+    if (gpa10 >= 5.0) return "D+";
+    if (gpa10 >= 4.0) return "D";
+    return "F";
+}
+
+function updateWeightLabels() {
+    // Currently labels are the same for both methods (CC1, CC2, GK, CK)
+}
 
 

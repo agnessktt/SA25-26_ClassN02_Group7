@@ -29,47 +29,32 @@ def handle_enrollments():
     if request.method == "POST":
         data = request.get_json(force=True)
         student_id = data.get("student_id")
-        course_code = data.get("course_code")
+        course_id = data.get("course_id") or data.get("course_code")
 
-        if not student_id or not course_code:
-            return jsonify({"error": "Missing student_id or course_code"}), 400
-
-        # Optional: Validate Student
-        try:
-            s_resp = requests.get(f"{STUDENT_SERVICE_URL}/{student_id}")
-            if s_resp.status_code != 200:
-                return jsonify({"error": "Student not found"}), 400
-        except:
-             pass # Ignore if service down for now
-
-        # Optional: Validate Course
-        try:
-            c_resp = requests.get(f"{COURSE_SERVICE_URL}/{course_code}")
-            if c_resp.status_code != 200:
-                return jsonify({"error": "Course not found"}), 400
-        except:
-             pass
+        if not student_id or not course_id:
+            return jsonify({"error": "Missing student_id or course_id"}), 400
 
         try:
-            enrollment = Enrollment(None, student_id, course_code)
+            enrollment = Enrollment(None, student_id, course_id)
             new_id = repo.add_enrollment(enrollment)
             enrollment.enrollment_id = new_id
             return jsonify(enrollment.to_dict()), 201
         except Exception as ex:
-            return jsonify({"error": str(ex)}), 400
+            print(f"Error adding enrollment: {ex}")
+            return jsonify({"error": f"Database error: {str(ex)}"}), 400
 
-@app.route("/api/enrollments/<enrollment_id>", methods=["PUT", "DELETE"])
+@app.route("/api/enrollments/<int:enrollment_id>", methods=["PUT", "DELETE"])
 def enrollment_detail(enrollment_id):
     if request.method == "PUT":
         data = request.get_json(force=True)
         student_id = data.get("student_id")
-        course_code = data.get("course_code")
+        course_id = data.get("course_id") or data.get("course_code")
         
-        if not student_id or not course_code:
-            return jsonify({"error": "Missing student_id or course_code"}), 400
+        if not student_id or not course_id:
+            return jsonify({"error": "Missing student_id or course_id"}), 400
 
         try:
-            success = repo.update_enrollment(enrollment_id, student_id, course_code)
+            success = repo.update_enrollment(enrollment_id, student_id, course_id)
             if success:
                 return jsonify({"message": "Updated successfully"}), 200
             else:
