@@ -94,7 +94,9 @@ The project demonstrates the transition from a traditional **Monolithic Architec
 git clone https://github.com/agnessktt/SA25-26_ClassN02_Group7.git
 cd SA25-26_ClassN02_Group7
 
-2️⃣ Configure environment variables
+---
+
+### 2️⃣ Configure environment variables
 
 Create a .env file for each microservice:
 
@@ -103,13 +105,18 @@ DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=sa
 
-3️⃣ Install dependencies
+---
+
+### 3️⃣ Install dependencies
 pip install -r requirements.txt
 
-4️⃣ Run services
+---
+
+### 4️⃣ Run services
 
 Each microservice is started independently:
 
 python app.py
 
 ---
+
