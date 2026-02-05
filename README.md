@@ -1,124 +1,95 @@
-📘 Student Grade Management System (SGMS)
+# Academic Management System (AMS)
+Microservices-based Academic Management System
 
-1. Project Introduction
+This repository contains the **Academic Management System (AMS)** project developed using **Microservices Architecture** as part of the **Software Architecture** course at **Phenikaa University**.
 
-The Student Grade Management System (SGMS) is a simple system designed for a small academic department to manage student grades. The system supports managing students, courses, enrollments, and assigning/viewing grades in an efficient manner.
+The system supports student management, course registration, grading, GPA calculation, and asynchronous email notifications, following modern distributed system design principles.
 
-This project is developed as part of the Software Architecture course, with a focus on applying the Layered Architecture using a 2-Tier (Client–Server) model.
+---
 
-2. Project Objectives
+## 📚 Course Information
 
-Apply a layered architecture following academic standards
+- **Course**: Software Architecture  
+- **Class**: CSE703110-1-2-25 (N02)  
+- **Academic Year**: 2025 – 2026  
+- **University**: Phenikaa University  
+- **Instructor**: M.S. Vu Quang Dung  
 
-Manage student and course information
+---
 
-Manage student enrollments
+## 👥 Team Information – Group 7
 
-Allow faculty members to assign and view grades
+| No. | Name | Student ID | Responsibility |
+|----|------|------------|----------------|
+| 1 | Le Thi Kieu Trang | 23010502 | Use Case Modeling, Conclusion & Reflection |
+| 2 | Quach Huu Nam | 23012358 | Key Quality Attributes, Testing & Deployment |
+| 3 | Trieu Tien Quynh | 23010648 | Core Functional Requirements, Architecture Design & Implementation |
 
-Practice architectural design, UML modeling, and system documentation
+---
 
-3. Functional Scope
+## 🎯 Project Overview
 
-Main Features
+The **Academic Management System (AMS)** is designed to support the **credit-based training model** in universities.
 
-Add, update, and view student information
+The system allows:
+- **Students** to register courses, view grades, transcripts, and GPA
+- **Lecturers** to enter, manage, and finalize grades
+- **Administrators** to manage academic structures and generate reports
 
-Add, update, and view course information
+The project demonstrates the transition from a traditional **Monolithic Architecture** to a **Microservices Architecture**, improving scalability, maintainability, and fault isolation.
 
-Enroll students in courses
+---
 
-Assign grades to students
+## 🏗 Architecture Overview
 
-View grades and calculate GPA
+- **Architecture Style**: Microservices Architecture
+- **Frontend**: Vanilla JavaScript (Single Page Application)
+- **Backend**: Python Flask (Independent Microservices)
+- **Database**: MySQL (Shared database with logical separation)
+- **Communication**:
+  - RESTful APIs (Synchronous)
+  - Background Threads (Asynchronous processing)
 
-System Users
+---
 
-Admin: manages students and courses
+## 🧩 Microservices List
 
-Faculty: assigns and views grades
+| Service Name | Port | Responsibility |
+|-------------|------|----------------|
+| Identity Service | 5004 | Authentication & Authorization (JWT, RBAC) |
+| Student Service | 5001 | Student profile management |
+| Course Service | 5002 | Course and class management |
+| Grade Service | 5003 | Grade entry and GPA calculation |
+| Email Service | 5005 | Asynchronous email notification |
+| Enrollment Service | 5006 | Course registration and cancellation |
+| Faculty Service | 5007 | Faculty management |
+| University Service | 5008 | University management |
+| Major Service | 5009 | Major management |
+| KKT Service | 5010 | Curriculum knowledge blocks |
 
-4. System Architecture
+---
 
-4.1 Architectural Model
+## ⚙️ Technology Stack
 
-Architecture Style: Layered Architecture
+### Frontend
+- HTML5, CSS3
+- Vanilla JavaScript (ES6+)
+- Fetch API
 
-Deployment Model: 2-Tier
+### Backend
+- Python 3
+- Flask
+- RESTful API
+- Threading for asynchronous tasks
 
-Client: Web UI (Presentation Layer)
+### Database
+- MySQL
 
-Server: Business Logic, Persistence, and Data Layers
+---
 
-4.2 Logical Layers
+## 🚀 How to Run (Localhost)
 
-Presentation Layer (Controller)
-
-Business Logic Layer (Service)
-
-Persistence Layer (Repository)
-
-Data Layer (Database)
-
-5. Data Model
-
-The system uses the following core data model:
-
-Student
-
-Course
-
-Enrollment (links Student and Course and stores grades)
-
-6. Technologies Used
-
-Programming Language: TBD
-
-Framework: TBD
-
-Database: SQLite
-
-UML Design Tools: Draw.io
-
-Version Control: GitHub
-
-7. Related Documents
-Software Requirement Specification (SRS)
-
-Architectural Design Document
-
-Project Plan
-
-UML Diagrams:
-
-Use Case Diagram (Lab 1)
-
-Component Diagram (Lab 2)
-
-8. Team Members
-
-Group 7 – Class CSE703110-1-2-25 (N02)
-
-Le Thi Kieu Trang – 23010502
-
-Quach Huu Nam – 23012358
-
-Trieu Tien Quynh – 23010648
-
-9. Project Status
-
-Requirements Analysis
-
-Architectural Design
-
-UML Component Diagram
-
-Documentation
-
-System Implementation (if applicable)
-
-10. Notes
-
-This project is developed for educational purposes. The architecture and functionality are designed to match a small-scale system and the requirements of the course.
-
-📌 This README provides a quick overview of the project for GitHub or project submission.
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/agnessktt/SA25-26_ClassN02_Group7.git
+cd SA25-26_ClassN02_Group7
