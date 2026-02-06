@@ -19,11 +19,11 @@ The system supports student management, course registration, grading, GPA calcul
 
 ## 👥 Team Information – Group 7
 
-| No. | Name | Student ID | Responsibility |
-|----|------|------------|----------------|
-| 1 | Le Thi Kieu Trang | 23010502 | Use Case Modeling, Conclusion & Reflection |
-| 2 | Quach Huu Nam | 23012358 | Key Quality Attributes, Testing & Deployment |
-| 3 | Trieu Tien Quynh | 23010648 | Core Functional Requirements, Architecture Design & Implementation |
+| No. | Name | Student ID | 
+|----|------|------------|
+| 1 | Le Thi Kieu Trang | 23010502 | 
+| 2 | Quach Huu Nam | 23012358 | 
+| 3 | Trieu Tien Quynh | 23010648 | 
 
 ---
 
@@ -65,7 +65,7 @@ The project demonstrates the transition from a traditional **Monolithic Architec
 | Faculty Service | 5007 | Faculty management |
 | University Service | 5008 | University management |
 | Major Service | 5009 | Major management |
-| KKT Service | 5010 | Curriculum knowledge blocks |
+| Notification Service | 5010 | RabbitMQ consumer for real-time student alerts |
 
 ---
 
@@ -93,30 +93,79 @@ The project demonstrates the transition from a traditional **Monolithic Architec
 ```bash
 git clone https://github.com/agnessktt/SA25-26_ClassN02_Group7.git
 cd SA25-26_ClassN02_Group7
-
----
+```
 
 ### 2️⃣ Configure environment variables
-
+```bash
 Create a .env file for each microservice:
 
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=sa
+```
 
 ---
 
 ### 3️⃣ Install dependencies
+```bash
 pip install -r requirements.txt
-
+```
 ---
 
 ### 4️⃣ Run services
-
+```bash
 Each microservice is started independently:
 
 python app.py
+```
+---
+
+## 🧪 Testing
+
+### The system is tested using
+- Unit Testing
+- Integration Testing
+- Functional Testing
+- End-to-End Testing
+
+### Tools
+- Postman
+- cURL
+---
+
+## 📌 Key Features
+
+✔ JWT Authentication & RBAC
+
+✔ Microservices Architecture
+
+✔ GPA Calculation
+
+✔ Course Enrollment Management
+
+✔ Asynchronous Email Notification
+
+✔ Modular and Scalable Design
 
 ---
+
+## 📖 Academic Purpose
+
+This project was developed for educational purposes to demonstrate:
+- Microservices Design
+- C4 Architecture Modeling
+- Distributed System Communication
+- Software Architecture Documentation
+
+---
+
+## 📜 License
+
+This project is developed for academic purposes at Phenikaa University.
+
+---
+
+
+
 
