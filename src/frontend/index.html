@@ -127,6 +127,7 @@
                     <div class="nav-section admin-faculty-only">
                         <div class="nav-section-title admin-faculty-only"><i class="fas fa-tasks" style="margin-right: 8px;"></i> Quản lý đào tạo</div>
                         <button class="nav-btn admin-only" onclick="showPage('courses')">Quản lý học phần</button>
+                        <button class="nav-btn admin-only" onclick="showPage('approve_enrollment')">Duyệt học phần</button>
                         <button class="nav-btn admin-faculty-only" onclick="showPage('students')">Sinh viên</button>
                         <button class="nav-btn faculty-only" onclick="showPage('grades')">Quản lý điểm</button>
                     </div>
@@ -249,6 +250,28 @@
             </div>
 
             <!-- Students Page -->
+            <div id="approve_enrollment" class="page">
+                <h2 class="page-header-title">Duyệt đăng ký học phần</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mã SV</th>
+                                <th>Mã học phần</th>
+                                <th>Ngày đăng ký</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="approvalTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center-muted">Đang tải dữ liệu...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div id="students" class="page">
                 <h2 class="page-header-title">Quản lý sinh viên</h2>
                 

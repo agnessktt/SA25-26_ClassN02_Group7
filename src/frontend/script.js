@@ -523,6 +523,8 @@ function showPage(pageId) {
         updateGradeSelects();
     } else if (pageId === 'enrollment') {
         loadEnrollmentData();
+    } else if (pageId === 'approve_enrollment') {
+        loadApprovalData();
     } else if (pageId === 'student-grades') {
         loadStudentResults();
     }
@@ -2506,21 +2508,84 @@ function closeEnrolledDetailsModal() {
     if (modal) modal.style.display = 'none';
 }
 
+async function loadApprovalData() {
+    const tbody = document.getElementById('approvalTableBody');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(API_ENROLLMENTS_SVC);
+        if (!res.ok) throw new Error('Failed to fetch enrollments');
+        const allEnrollments = await res.json();
+        
+        // Filter only pending ones
+        const pending = allEnrollments.filter(e => e.status === 'pending');
+
+        if (pending.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center-muted">Không có yêu cầu đăng ký nào đang chờ</td></tr>';
+        } else {
+            tbody.innerHTML = pending.map(e => `
+                <tr>
+                    <td>${e.student_id}</td>
+                    <td>${e.course_id}</td>
+                    <td>${e.enrollment_date}</td>
+                    <td><span class="badge badge-warning">Đang chờ</span></td>
+                    <td>
+                        <button class="btn btn-success btn-sm" onclick="approveEnrollment(${e.enrollment_id})">Duyệt</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Lỗi tải dữ liệu</td></tr>';
+    }
+}
+
+async function approveEnrollment(id) {
+    if (!confirm('Bạn có chắc chắn muốn duyệt đăng ký này?')) return;
+    
+    try {
+        const res = await fetch(`${API_ENROLLMENTS_SVC}/${id}/approve`, { method: 'POST' });
+        if (res.ok) {
+            alert('Đã duyệt thành công!');
+            loadApprovalData();
+            // Refresh grades list so the student appears in course lists
+            if (typeof loadGrades === 'function') loadGrades(); 
+        } else {
+            const data = await res.json();
+            alert('Lỗi: ' + (data.error || 'Không rõ nguyên nhân'));
+        }
+    } catch (err) {
+        alert('Lỗi kết nối server');
+    }
+}
+
 async function loadEnrollmentData() {
     const tbody = document.getElementById('enrollmentTableBody');
     if (!tbody) return;
 
     const currentId = getCurrentStudentId();
-    // Filter courses that students can enroll in
-    const studentGrades = grades.filter(g => String(g.studentId) === String(currentId));
-    const enrolledCourseIds = studentGrades.map(g => String(g.courseId));
+    
+    // Fetch all enrollments for this student (both pending and approved)
+    let studentEnrollments = [];
+    try {
+        const res = await fetch(`${API_ENROLLMENTS_SVC}?student_id=${currentId}`);
+        if(res.ok) {
+            studentEnrollments = await res.json();
+        }
+    } catch (e) {
+        console.error("Error fetching student enrollments:", e);
+    }
+    
+    const enrolledCourseIds = studentEnrollments.map(e => String(e.course_id));
 
-    // Calculate stats
+    // Calculate stats (only for approved ones)
     let totalCredits = 0;
     let enrolledCount = 0;
 
     courses.forEach(c => {
-        if (enrolledCourseIds.includes(String(c.id))) {
+        const enrollment = studentEnrollments.find(e => String(e.course_id) === String(c.id));
+        if (enrollment && enrollment.status === 'approved') {
             totalCredits += (parseInt(c.credits) || 0);
             enrolledCount++;
         }
@@ -2533,12 +2598,33 @@ async function loadEnrollmentData() {
     if (creditsEl) creditsEl.innerText = totalCredits;
 
     // Filter OUT enrolled courses from the list
-    const availableCourses = courses.filter(c => !enrolledCourseIds.includes(String(c.id)));
+    let rowsHtml = '';
+    
+    // Show courses student HAS registered for but might be PENDING
+    studentEnrollments.forEach(e => {
+        const course = courses.find(c => String(c.id) === String(e.course_id));
+        if (course) {
+            const statusBadge = e.status === 'approved' 
+                ? '<span class="badge badge-success">Đã duyệt</span>' 
+                : '<span class="badge badge-warning">Đang chờ duyệt</span>';
+            rowsHtml += `
+                <tr>
+                    <td>${course.id}</td>
+                    <td>${course.name}</td>
+                    <td>${course.credits}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" disabled>Đã đăng ký</button>
+                    </td>
+                </tr>
+            `;
+        }
+    });
 
-    if (availableCourses.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center-muted">Bạn đã đăng ký tất cả học phần hiện có</td></tr>';
-    } else {
-        tbody.innerHTML = availableCourses.map(c => `
+    // Show available courses
+    const availableCourses = courses.filter(c => !enrolledCourseIds.includes(String(c.id)));
+    availableCourses.forEach(c => {
+        rowsHtml += `
             <tr>
                 <td>${c.id}</td>
                 <td>${c.name}</td>
@@ -2548,7 +2634,13 @@ async function loadEnrollmentData() {
                     <button class="btn btn-primary btn-sm" onclick="enrollCourse('${c.id}')">Đăng ký</button>
                 </td>
             </tr>
-        `).join('');
+        `;
+    });
+
+    if (studentEnrollments.length === 0 && availableCourses.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center-muted">Không có học phần nào</td></tr>';
+    } else {
+        tbody.innerHTML = rowsHtml;
     }
 }
 

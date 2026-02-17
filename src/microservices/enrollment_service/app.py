@@ -69,6 +69,17 @@ def enrollment_detail(enrollment_id):
         except Exception as ex:
             return jsonify({"error": str(ex)}), 500
 
+@app.route("/api/enrollments/<int:enrollment_id>/approve", methods=["POST"])
+def approve_enrollment(enrollment_id):
+    try:
+        success = repo.approve_enrollment(enrollment_id)
+        if success:
+            return jsonify({"message": "Approved successfully"}), 200
+        else:
+            return jsonify({"error": "Enrollment not found"}), 404
+    except Exception as ex:
+        return jsonify({"error": str(ex)}), 500
+
 if __name__ == "__main__":
     # Running on Port 5006 to avoid conflict with Grade Service (5003)
     app.run(debug=True, port=5006)

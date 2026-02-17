@@ -26,13 +26,11 @@ class EnrollmentRepository:
             if cursor.fetchone():
                 raise Exception("Sinh viên đã đăng ký học phần này rồi")
 
-            # 2. Insert into 'enrollments' table
-            sql_enroll = "INSERT INTO enrollments (student_id, course_id, enrollment_date) VALUES (%s, %s, CURDATE())"
+            # 2. Insert into 'enrollments' table (default status is 'pending')
+            sql_enroll = "INSERT INTO enrollments (student_id, course_id, enrollment_date, status) VALUES (%s, %s, CURDATE(), 'pending')"
             cursor.execute(sql_enroll, (enrollment.student_id, enrollment.course_id))
             
-            # 3. ALSO Insert into 'grade' table to ensure visibility in Grade Service
-            sql_grade = "INSERT INTO grade (student_id, course_id) VALUES (%s, %s)"
-            cursor.execute(sql_grade, (enrollment.student_id, enrollment.course_id))
+            # 3. DO NOT insert into 'grade' until approved
             
             conn.commit()
             return cursor.lastrowid
@@ -49,16 +47,15 @@ class EnrollmentRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT g.grade_id, g.student_id, g.course_id, c.total_credits, e.enrollment_date
-                FROM grade g
-                JOIN courses c ON g.course_id = c.course_id
-                LEFT JOIN enrollments e ON g.student_id = e.student_id AND g.course_id = e.course_id
+                SELECT e.enrollment_id, e.student_id, e.course_id, c.total_credits, e.enrollment_date, e.status
+                FROM enrollments e
+                JOIN courses c ON e.course_id = c.course_id
             """
             cursor.execute(sql)
             rows = cursor.fetchall()
             results = []
             for r in rows:
-                e = Enrollment(r[0], r[1], r[2], r[4]) # ID, Student, Course, Date
+                e = Enrollment(r[0], r[1], r[2], r[4], r[5]) # ID, Student, Course, Date, Status
                 e.credits = r[3]
                 results.append(e)
             return results
@@ -71,20 +68,44 @@ class EnrollmentRepository:
         cursor = conn.cursor()
         try:
             sql = """
-                SELECT g.grade_id, g.student_id, g.course_id, c.total_credits, e.enrollment_date
-                FROM grade g
-                JOIN courses c ON g.course_id = c.course_id
-                LEFT JOIN enrollments e ON g.student_id = e.student_id AND g.course_id = e.course_id
-                WHERE g.student_id = %s
+                SELECT e.enrollment_id, e.student_id, e.course_id, c.total_credits, e.enrollment_date, e.status
+                FROM enrollments e
+                JOIN courses c ON e.course_id = c.course_id
+                WHERE e.student_id = %s
             """
             cursor.execute(sql, (student_id,))
             rows = cursor.fetchall()
             results = []
             for r in rows:
-                e = Enrollment(r[0], r[1], r[2], r[4])
+                e = Enrollment(r[0], r[1], r[2], r[4], r[5])
                 e.credits = r[3]
                 results.append(e)
             return results
+        finally:
+            cursor.close()
+            conn.close()
+
+    def approve_enrollment(self, enrollment_id):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        try:
+            # 1. Update status to approved
+            sql_update = "UPDATE enrollments SET status = 'approved' WHERE enrollment_id = %s"
+            cursor.execute(sql_update, (enrollment_id,))
+            
+            # 2. Get student_id and course_id to insert into grade
+            cursor.execute("SELECT student_id, course_id FROM enrollments WHERE enrollment_id = %s", (enrollment_id,))
+            row = cursor.fetchone()
+            if row:
+                student_id, course_id = row
+                # Check if already in grade table to avoid duplicates
+                cursor.execute("SELECT grade_id FROM grade WHERE student_id = %s AND course_id = %s", (student_id, course_id))
+                if not cursor.fetchone():
+                    sql_grade = "INSERT INTO grade (student_id, course_id) VALUES (%s, %s)"
+                    cursor.execute(sql_grade, (student_id, course_id))
+            
+            conn.commit()
+            return cursor.rowcount > 0
         finally:
             cursor.close()
             conn.close()
@@ -93,40 +114,41 @@ class EnrollmentRepository:
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            # 1. Get old info to update 'enrollments' table
-            cursor.execute("SELECT student_id, course_id FROM grade WHERE grade_id = %s", (enrollment_id,))
+            # 1. Get old info from enrollments table
+            cursor.execute("SELECT student_id, course_id FROM enrollments WHERE enrollment_id = %s", (enrollment_id,))
             old_data = cursor.fetchone()
+            if not old_data:
+                return False
             
-            # 2. Update 'grade' table
-            sql_grade = "UPDATE grade SET student_id = %s, course_id = %s WHERE grade_id = %s"
-            cursor.execute(sql_grade, (student_id, course_id, enrollment_id))
+            # 2. Update 'enrollments' table
+            sql_enroll = "UPDATE enrollments SET student_id = %s, course_id = %s WHERE enrollment_id = %s"
+            cursor.execute(sql_enroll, (student_id, course_id, enrollment_id))
             
-            # 3. Update 'enrollments' table if old data exists
-            if old_data:
-                sql_enroll = "UPDATE enrollments SET student_id = %s, course_id = %s WHERE student_id = %s AND course_id = %s"
-                cursor.execute(sql_enroll, (student_id, course_id, old_data[0], old_data[1]))
+            # 3. Update 'grade' table if it exists (meaning it was approved)
+            sql_grade = "UPDATE grade SET student_id = %s, course_id = %s WHERE student_id = %s AND course_id = %s"
+            cursor.execute(sql_grade, (student_id, course_id, old_data[0], old_data[1]))
             
             conn.commit()
-            return cursor.rowcount > 0
+            return True
         finally:
             cursor.close()
             conn.close()
 
-    def delete_enrollment(self, e_id: int):
+    def delete_enrollment(self, enrollment_id):
         conn = self._get_conn()
         cursor = conn.cursor()
         try:
-            # 1. Get info to delete from 'enrollments' table
-            cursor.execute("SELECT student_id, course_id FROM grade WHERE grade_id = %s", (e_id,))
+            # 1. Get info to delete
+            cursor.execute("SELECT student_id, course_id FROM enrollments WHERE enrollment_id = %s", (enrollment_id,))
             data = cursor.fetchone()
             
-            # 2. Delete from 'grade' table
-            cursor.execute("DELETE FROM grade WHERE grade_id = %s", (e_id,))
+            # 2. Delete from enrollments
+            cursor.execute("DELETE FROM enrollments WHERE enrollment_id = %s", (enrollment_id,))
             
-            # 3. Delete from 'enrollments' table if data exists
+            # 3. Delete from grade if exists
             if data:
-                cursor.execute("DELETE FROM enrollments WHERE student_id = %s AND course_id = %s", (data[0], data[1]))
-                
+                cursor.execute("DELETE FROM grade WHERE student_id = %s AND course_id = %s", (data[0], data[1]))
+            
             conn.commit()
             return True
         finally:
